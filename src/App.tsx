@@ -1,121 +1,89 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import axios from 'axios'
+import { type FormEvent, useContext, useState } from 'react'
+import { AuthContext } from './contexts/AuthContext'
+import { cadastrarUsuario } from './services/Service'
+import { ToastAlerta } from './utils/ToastAlerta'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { usuario, handleLogin, handleLogout, isLoading } = useContext(AuthContext)
+  const [modoCadastro, setModoCadastro] = useState(false)
+  const [nome, setNome] = useState('')
+  const [celular, setCelular] = useState('')
+  const [genero, setGenero] = useState('')
+  const [usuarioLogin, setUsuarioLogin] = useState('')
+  const [senha, setSenha] = useState('')
+  const [enviandoCadastro, setEnviandoCadastro] = useState(false)
+
+  async function enviarFormulario(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (modoCadastro) {
+      setEnviandoCadastro(true)
+      try {
+        await cadastrarUsuario('/usuarios/cadastrar', { nome, celular, genero, usuario: usuarioLogin, senha, foto: '' }, () => {})
+        ToastAlerta('Cadastro realizado com sucesso!', 'sucesso')
+        setModoCadastro(false)
+        setNome('')
+        setCelular('')
+        setGenero('')
+        setSenha('')
+      } catch (error) {
+        const status = axios.isAxiosError(error) ? ` (${error.response?.status ?? 'sem resposta'})` : ''
+        const detalhe = axios.isAxiosError(error) && typeof error.response?.data === 'string'
+          ? `: ${error.response.data}`
+          : ''
+        ToastAlerta(`Erro ao cadastrar o usuário${status}${detalhe}.`, 'erro')
+      } finally {
+        setEnviandoCadastro(false)
+      }
+      return
+    }
+
+    handleLogin({ id: 0, nome: '', usuario: usuarioLogin, senha, celular: '', foto: '', token: '' })
+  }
+
+  if (usuario.token) {
+    return (
+      <main className="app-shell">
+        <section className="welcome-panel" aria-live="polite">
+          <span className="eyebrow">Carona</span>
+          <h1>Olá, {usuario.nome || usuario.usuario}.</h1>
+          <p>Seu acesso foi autenticado com sucesso.</p>
+          <button className="secondary-button" type="button" onClick={handleLogout}>Sair da conta</button>
+        </section>
+      </main>
+    )
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <main className="app-shell">
+      <section className="login-panel">
+        <div className="login-intro">
+          <span className="eyebrow">Carona</span>
+          <h1>Viaje melhor, junto.</h1>
+          <p>{modoCadastro ? 'Crie sua conta para começar.' : 'Entre para encontrar suas próximas caronas.'}</p>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+        <form className="login-form" onSubmit={enviarFormulario}>
+          {modoCadastro && <>
+            <label htmlFor="nome">Nome</label>
+            <input id="nome" type="text" value={nome} onChange={(event) => setNome(event.target.value)} placeholder="Digite seu nome" required />
+            <label htmlFor="celular">Celular</label>
+            <input id="celular" type="tel" value={celular} onChange={(event) => setCelular(event.target.value)} placeholder="(00) 00000-0000" minLength={11} required />
+            <label htmlFor="genero">Gênero</label>
+            <input id="genero" type="text" value={genero} onChange={(event) => setGenero(event.target.value)} placeholder="Digite seu gênero" required />
+          </>}
+          <label htmlFor="usuario">Usuário</label>
+          <input id="usuario" type="email" value={usuarioLogin} onChange={(event) => setUsuarioLogin(event.target.value)} placeholder="email@exemplo.com" autoComplete="username" required />
+          <label htmlFor="senha">Senha</label>
+          <input id="senha" type="password" value={senha} onChange={(event) => setSenha(event.target.value)} placeholder="Digite sua senha" autoComplete="current-password" required />
+          <button className="login-button" type="submit" disabled={isLoading || enviandoCadastro}>{isLoading || enviandoCadastro ? 'Enviando...' : modoCadastro ? 'Cadastrar' : 'Entrar'}</button>
+          <button className="switch-button" type="button" onClick={() => setModoCadastro((modoAtual) => !modoAtual)}>
+            {modoCadastro ? 'Já tenho uma conta' : 'Ainda não tenho cadastro'}
+          </button>
+        </form>
       </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    </main>
   )
 }
 
