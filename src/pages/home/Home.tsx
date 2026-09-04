@@ -1,4 +1,3 @@
-import React from 'react';
 import { MagnifyingGlass, CalendarBlank, Users, MapPin, Handshake, Leaf, Wheelchair, GenderFemale } from '@phosphor-icons/react';
 
 function Home() {

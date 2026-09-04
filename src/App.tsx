@@ -3,6 +3,7 @@ import Footer from "./components/footer/Footer"
 import Navbar from "./components/navbar/Navbar"
 import Login from "./pages/login/Login"
 import Cadastro from "./pages/cadastro/Cadastro"
+import Home from "./pages/home/Home"
 
 function AppContent() {
 	const { pathname } = useLocation()
@@ -16,6 +17,7 @@ function AppContent() {
 						<Route path="/" element={<Navigate to="/login" replace />} />
 						<Route path="/login" element={<Login />} />
 						<Route path="/cadastro" element={<Cadastro />} />
+						<Route path="/home" element={<Home />} />
 					</Routes>
 				</main>
 				{!isAuthenticationPage && <Footer />}
