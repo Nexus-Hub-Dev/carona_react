@@ -5,6 +5,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import { ToastContainer } from "react-toastify"
 import { AuthProvider } from "./contexts/AuthContext"
 import { Caronas } from "./pages/caronas/Caronas"
+import { CriarCarona } from "./pages/caronas/CriarCaronas"
 
 function App() {
 	return (
@@ -15,6 +16,7 @@ function App() {
 					<div className="min-h-[80vh]">
 						<Routes>
 							<Route path="/caronas" element={<Caronas />} />
+							<Route path="/oferecer-carona" element={<CriarCarona />} />
 						</Routes>
 					</div>
 					<Footer />
