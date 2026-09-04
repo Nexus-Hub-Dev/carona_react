@@ -5,3 +5,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 button, input { font: inherit; }
+
+@utility form-input {
+	@apply mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-3 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0];
+}
