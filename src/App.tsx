@@ -4,6 +4,7 @@ import Navbar from "./components/navbar/Navbar"
 import 'react-toastify/dist/ReactToastify.css'
 import { ToastContainer } from "react-toastify"
 import { AuthProvider } from "./contexts/AuthContext"
+import { Caronas } from "./pages/caronas/Caronas"
 
 function App() {
 	return (
@@ -13,6 +14,7 @@ function App() {
 					<Navbar />
 					<div className="min-h-[80vh]">
 						<Routes>
+							<Route path="/caronas" element={<Caronas />} />
 						</Routes>
 					</div>
 					<Footer />
