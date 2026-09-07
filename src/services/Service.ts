@@ -10,8 +10,10 @@ export interface CalculoRota {
     horarioChegada: string
 }
 
-export const calcularRota = async (origem: string, destino: string): Promise<CalculoRota> => {
-    const resposta = await api.post('/viagens/sugestao-valor', { origem, destino })
+export const calcularRota = async (origem: string, destino: string, token: string): Promise<CalculoRota> => {
+    const resposta = await api.post('/viagens/sugestao-valor', { origem, destino }, {
+        headers: { Authorization: `Bearer ${token}` }
+    })
     return resposta.data
 }
 

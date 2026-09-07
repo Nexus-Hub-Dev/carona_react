@@ -1,13 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useContext, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ToastAlerta } from '../../utils/ToastAlerta';
 import { obterVeiculos } from '../../utils/veiculos';
 import type { Veiculo } from '../../models/Veiculo';
 import { calcularRota, type CalculoRota } from '../../services/Service';
+import { AuthContext } from '../../contexts/AuthContext';
 
 // Interfaces de apoio para integração com Back-end/Front-end
 export function CriarCarona() {
   const navigate = useNavigate();
+  const { usuario } = useContext(AuthContext);
   const [veiculos] = useState<Veiculo[]>(obterVeiculos);
 
   // Busca o veículo ativo atual
@@ -38,7 +40,7 @@ export function CriarCarona() {
     setErroCalculoRota('');
 
     try {
-      const resultado = await calcularRota(origem.trim(), destino.trim());
+      const resultado = await calcularRota(origem.trim(), destino.trim(), usuario.token);
       setCalculoRota(resultado);
     } catch {
       setCalculoRota(null);
