@@ -1,5 +1,5 @@
 import axios from "axios";
-import { createContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useEffect, useState, type ReactNode } from "react";
 import type UsuarioLogin from "../models/UsuarioLogin";
 import { login } from "../services/Service";
 import { ToastAlerta } from "../utils/ToastAlerta";
@@ -25,7 +25,7 @@ const sanitizeUsuario = (usuario: Partial<UsuarioLogin>): UsuarioLogin => ({
 //  Definir os Estados e Funções disponibilizadas pela Context
 interface AuthContextProps {
     usuario: UsuarioLogin
-    handleLogin(usuario: UsuarioLogin): void
+    handleLogin(usuario: UsuarioLogin): Promise<boolean>
     handleLogout(): void
     isLoading: boolean
     isLogout: boolean
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Inicializar o estado isLoading
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    const isLogout = useRef(false)
+    const [isLogout, setIsLogout] = useState(false)
 
     useEffect(() => {
         if (usuario.token !== '') {
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, [usuario])
 
     // Implementar a função handleLogin
-    async function handleLogin(usuarioLogin: UsuarioLogin) {
+    async function handleLogin(usuarioLogin: UsuarioLogin): Promise<boolean> {
 
         setIsLoading(true);
 
@@ -86,13 +86,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
             })
             ToastAlerta("Usuário Autenticado com sucesso!", "sucesso")
 
-            isLogout.current = false
+            setIsLogout(false)
+            return true
 
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 ToastAlerta(`Erro ao autenticar o usuário (${error.response?.status})`, "erro")
-                return
+                return false
             }
+            ToastAlerta('Não foi possível autenticar o usuário.', 'erro')
+            return false
         } finally {
             setIsLoading(false)
         }
@@ -101,7 +104,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Implementar a função handleLogout (desconectar o Usuario)
     function handleLogout() {
 
-        isLogout.current = true
+        setIsLogout(true)
 
         setUsuario(usuarioInicial)
         localStorage.removeItem(STORAGE_KEY)
@@ -110,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     }
     return (
-        <AuthContext.Provider value={{ usuario, handleLogin, handleLogout, isLoading, isLogout: isLogout.current }}>
+        <AuthContext.Provider value={{ usuario, handleLogin, handleLogout, isLoading, isLogout }}>
             {children}
         </AuthContext.Provider>
     )
