@@ -1,21 +1,14 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ToastAlerta } from '../../utils/ToastAlerta';
+import { obterVeiculos } from '../../utils/veiculos';
+import type { Veiculo } from '../../models/Veiculo';
+import { calcularRota, type CalculoRota } from '../../services/Service';
 
 // Interfaces de apoio para integração com Back-end/Front-end
-interface Veiculo {
-  id: number;
-  modelo: string;
-  placa: string;
-  cor: string;
-  ativo: boolean;
-}
-
 export function CriarCarona() {
-  // Simulação de verificação de veículo ativo do usuário logado
-  // Altere para carregar da sua API ou Contexto de Autenticação
-  const [veiculos] = useState<Veiculo[]>([
-    { id: 1, modelo: 'Nissan Kicks Azul', placa: 'BRA2E19', cor: 'Azul', ativo: true },
-  ]);
+  const navigate = useNavigate();
+  const [veiculos] = useState<Veiculo[]>(obterVeiculos);
 
   // Busca o veículo ativo atual
   const veiculoAtivo = useMemo(() => veiculos.find((v) => v.ativo), [veiculos]);
@@ -26,9 +19,10 @@ export function CriarCarona() {
   const [destino, setDestino] = useState('');
   const [bairroDestino, setBairroDestino] = useState('');
   const [horarioSaida, setHorarioSaida] = useState('');
-  const [horarioChegada, setHorarioChegada] = useState('');
   const [vagasDisponiveis, setVagasDisponiveis] = useState(3);
-  const [distanciaKm, setDistanciaKm] = useState<number | ''>('');
+  const [calculoRota, setCalculoRota] = useState<CalculoRota | null>(null);
+  const [calculandoRota, setCalculandoRota] = useState(false);
+  const [erroCalculoRota, setErroCalculoRota] = useState('');
   
   // Preferências/Filtros
   const [apenasMulheres, setApenasMulheres] = useState(false);
@@ -37,29 +31,22 @@ export function CriarCarona() {
   // Valor definido pelo motorista
   const [precoDigitado, setPrecoDigitado] = useState<string>('');
 
-  // Cálculo Dinâmico do Valor Sugerido
-  // Exemplo de regra: R$ 5,00 taxa base + R$ 2,50 por Km
-  const valorSugerido = useMemo(() => {
-    if (!distanciaKm || Number(distanciaKm) <= 0) return 0;
-    return 5.0 + Number(distanciaKm) * 2.5;
-  }, [distanciaKm]);
+  async function atualizarCalculoRota() {
+    if (!origem.trim() || !destino.trim()) return;
 
-  // Cálculo do Limite Máximo (+20%)
-  const valorMaximoPermitido = useMemo(() => {
-    return valorSugerido * 1.2;
-  }, [valorSugerido]);
+    setCalculandoRota(true);
+    setErroCalculoRota('');
 
-  // Validação se o preço digitado está acima do limite permitido (+20%)
-  const precoInvalido = useMemo(() => {
-    if (!precoDigitado || valorSugerido === 0) return false;
-    const numPreco = parseFloat(precoDigitado);
-    return numPreco > valorMaximoPermitido;
-  }, [precoDigitado, valorSugerido, valorMaximoPermitido]);
-
-  // Handler ao selecionar/usar o valor sugerido
-  const handleUsarValorSugerido = () => {
-    setPrecoDigitado(valorSugerido.toFixed(2));
-  };
+    try {
+      const resultado = await calcularRota(origem.trim(), destino.trim());
+      setCalculoRota(resultado);
+    } catch {
+      setCalculoRota(null);
+      setErroCalculoRota('Não foi possível calcular a rota. Confira os endereços e tente novamente.');
+    } finally {
+      setCalculandoRota(false);
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,15 +56,8 @@ export function CriarCarona() {
       return;
     }
 
-    if (!origem || !destino || !horarioSaida || !horarioChegada || !distanciaKm) {
+    if (!origem || !destino || !horarioSaida || !precoDigitado || !calculoRota) {
       ToastAlerta('Preencha todos os campos obrigatórios da rota!', 'erro');
-      return;
-    }
-
-    const valorFinal = precoDigitado ? parseFloat(precoDigitado) : valorSugerido;
-
-    if (valorFinal > valorMaximoPermitido) {
-      ToastAlerta('O valor por assento não pode exceder 20% do valor sugerido.', 'erro');
       return;
     }
 
@@ -87,9 +67,10 @@ export function CriarCarona() {
       destino,
       bairroDestino,
       horarioSaida,
-      horarioChegada,
-      distanciaKm: Number(distanciaKm),
-      preco: valorFinal,
+      horarioChegada: calculoRota.horarioChegada,
+      distanciaKm: calculoRota.distanciaKm,
+      tempoMinutos: calculoRota.tempoMinutos,
+      preco: parseFloat(precoDigitado),
       vagasDisponiveis,
       apenasMulheres,
       acessivelPcd,
@@ -98,6 +79,7 @@ export function CriarCarona() {
 
     console.log('Dados prontos para envio ao backend:', novaCorrida);
     ToastAlerta('Carona cadastrada e publicada com sucesso!', 'sucesso');
+    navigate('/caronas');
 
     // Limpar Formulário
     setOrigem('');
@@ -105,9 +87,8 @@ export function CriarCarona() {
     setDestino('');
     setBairroDestino('');
     setHorarioSaida('');
-    setHorarioChegada('');
-    setDistanciaKm('');
     setPrecoDigitado('');
+    setCalculoRota(null);
   };
 
   return (
@@ -186,6 +167,7 @@ export function CriarCarona() {
                     placeholder="Ex: Av. Paulista, 900"
                     value={origem}
                     onChange={(e) => setOrigem(e.target.value)}
+                    onBlur={atualizarCalculoRota}
                     className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
                   />
                 </div>
@@ -215,6 +197,7 @@ export function CriarCarona() {
                     placeholder="Ex: Faria Lima, 2777"
                     value={destino}
                     onChange={(e) => setDestino(e.target.value)}
+                    onBlur={atualizarCalculoRota}
                     className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
                   />
                 </div>
@@ -241,7 +224,7 @@ export function CriarCarona() {
                 2. Horários e Detalhes
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Horário de Saída *
@@ -255,34 +238,6 @@ export function CriarCarona() {
                   />
                 </div>
 
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
-                    Previsão de Chegada *
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={horarioChegada}
-                    onChange={(e) => setHorarioChegada(e.target.value)}
-                    className="w-full bg-transparent text-sm font-bold text-black focus:outline-none mt-1"
-                  />
-                </div>
-
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
-                    Distância Estimada (Km) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    required
-                    placeholder="Ex: 12.5"
-                    value={distanciaKm}
-                    onChange={(e) => setDistanciaKm(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
-                  />
-                </div>
               </div>
 
               {/* Vagas Disponíveis */}
@@ -301,7 +256,7 @@ export function CriarCarona() {
                   >
                     -
                   </button>
-                  <span className="font-black text-base text-black min-w-[20px] text-center">
+                  <span className="font-black text-base text-black min-w-5 text-center">
                     {vagasDisponiveis}
                   </span>
                   <button
@@ -315,79 +270,36 @@ export function CriarCarona() {
               </div>
             </div>
 
-            {/* ETAPA 3: PRECIFICAÇÃO E SUGESTÃO (+20%) */}
+            {/* ETAPA 3: PRECIFICAÇÃO */}
             <div className="space-y-4">
               <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-[#E2DDD3] pb-2">
                 3. Valor por Assento
               </h2>
-
-              {valorSugerido > 0 ? (
-                <div className="bg-[#FAF8F5] rounded-2xl p-4 border border-[#E2DDD3] space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E2DDD3] pb-3">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
-                        Cálculo Automático CORA
-                      </span>
-                      <p className="text-xs text-gray-600 font-medium">
-                        Baseado no trajeto de {distanciaKm} Km
-                      </p>
-                    </div>
-
-                    {/* VALOR SUGERIDO EM VERDE */}
-                    <div className="text-left sm:text-right flex items-center gap-2 sm:block">
-                      <span className="text-xs text-emerald-800 font-extrabold block">Valor Sugerido:</span>
-                      <span className="text-xl font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-300">
-                        R$ {valorSugerido.toFixed(2).replace('.', ',')}
-                      </span>
-                    </div>
+              <div className="bg-[#FAF8F5] rounded-2xl p-4 border border-[#E2DDD3]">
+                <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase mb-1">
+                  Valor por assento (R$) *
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  placeholder="Ex: 25,00"
+                  value={precoDigitado}
+                  onChange={(e) => setPrecoDigitado(e.target.value)}
+                  className="w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-2 text-sm font-bold text-black outline-none focus:border-black"
+                />
+                <p className="mt-2 text-xs text-gray-600">A distância e a previsão de chegada serão calculadas pela API.</p>
+                {calculandoRota && <p className="mt-3 text-xs font-bold text-gray-600">Calculando rota...</p>}
+                {erroCalculoRota && <p className="mt-3 text-xs font-bold text-red-600">{erroCalculoRota}</p>}
+                {calculoRota && (
+                  <div className="mt-3 grid gap-2 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900 sm:grid-cols-3">
+                    <span><strong>Distância:</strong> {calculoRota.distanciaKm} km</span>
+                    <span><strong>Duração:</strong> {calculoRota.tempoMinutos} min</span>
+                    <span><strong>Chegada:</strong> {calculoRota.horarioChegada}</span>
                   </div>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase mb-1">
-                        Seu Preço Desejado (R$)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder={`Até R$ ${valorMaximoPermitido.toFixed(2)}`}
-                        value={precoDigitado}
-                        onChange={(e) => setPrecoDigitado(e.target.value)}
-                        className={`w-full bg-white rounded-xl px-3 py-2 border text-sm font-bold focus:outline-none transition-all ${
-                          precoInvalido
-                            ? 'border-red-500 text-red-600 focus:ring-1 focus:ring-red-500'
-                            : 'border-[#E2DDD3] text-black focus:border-black'
-                        }`}
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleUsarValorSugerido}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm shrink-0 self-end"
-                    >
-                      Usar Valor Sugerido
-                    </button>
-                  </div>
-
-                  {/* MENSSAGEM DE REGRAS E MÁXIMO (+20%) */}
-                  <div className="text-[11px] font-semibold space-y-1 pt-1">
-                    <p className="text-gray-600">
-                      ℹ️ Você pode ajustar o preço em até **+20%** sobre o valor sugerido (Limite máximo:{' '}
-                      <strong className="text-black">R$ {valorMaximoPermitido.toFixed(2).replace('.', ',')}</strong>).
-                    </p>
-                    {precoInvalido && (
-                      <p className="text-red-600 font-bold">
-                        ❌ O valor inserido é superior ao limite permitido (+20%). Reduza para publicar.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-[#FAF8F5] rounded-xl p-4 border border-[#E2DDD3] text-center text-xs text-gray-500 font-medium">
-                  Insira a <strong className="text-black">Distância Estimada (Km)</strong> na etapa anterior para calcular o valor sugerido da corrida.
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* ETAPA 4: PREFERÊNCIAS E TAGS */}
@@ -427,12 +339,7 @@ export function CriarCarona() {
             <div className="pt-4 border-t border-[#E2DDD3]">
               <button
                 type="submit"
-                disabled={precoInvalido}
-                className={`w-full py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-sm ${
-                  precoInvalido
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-black hover:bg-gray-800 text-white active:scale-[0.99]'
-                }`}
+                className="w-full rounded-xl bg-black py-3.5 text-sm font-extrabold text-white shadow-sm transition-all hover:bg-gray-800 active:scale-[0.99]"
               >
                 Publicar Carona →
               </button>

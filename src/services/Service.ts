@@ -4,6 +4,24 @@ const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL
 })
 
+export interface CalculoRota {
+    distanciaKm: number
+    tempoMinutos: number
+    horarioChegada: string
+}
+
+export const calcularRota = async (origem: string, destino: string): Promise<CalculoRota> => {
+    const resposta = await api.post('/viagens/sugestao-valor', { origem, destino })
+    return resposta.data
+}
+
+export const atualizarUsuario = async (id: number, dados: object, token: string) => {
+    const resposta = await api.put(`/usuarios/${id}`, dados, {
+        headers: { Authorization: `Bearer ${token}` }
+    })
+    return resposta.data
+}
+
 // Função  cadastrar Usuario
 
 export const cadastrarUsuario = async (url: string, dados: Object, setDados: Function) => {
