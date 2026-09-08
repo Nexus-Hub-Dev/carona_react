@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { Veiculo } from "../models/Veiculo";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL
@@ -23,6 +24,13 @@ export const calcularRota = async (partida: string, destino: string, token: stri
 
 export const cadastrarViagem = async (dados: object, token: string) => {
     const resposta = await api.post('/viagens', dados, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const listarViagens = async (token: string): Promise<any[]> => {
+    const resposta = await api.get('/viagens', {
         headers: authorizationHeader(token)
     })
     return resposta.data
@@ -71,4 +79,11 @@ export const atualizar = async (url: string, dados: Object, setDados: Function, 
 
 export const deletar = async (url: string, header: Object) => {
     await api.delete(url, header)
+}
+
+export const listarVeiculos = async (token: string): Promise<Veiculo[]> => {
+    const resposta = await api.get('/veiculos', {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
 }

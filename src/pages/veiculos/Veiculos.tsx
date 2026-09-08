@@ -1,18 +1,43 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import type { Veiculo } from '../../models/Veiculo';
 import { salvarVeiculos, obterVeiculos } from '../../utils/veiculos';
+import { listarVeiculos } from '../../services/Service';
+import { AuthContext } from '../../contexts/AuthContext';
 
 export function Veiculos() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [veiculos, setVeiculos] = useState<Veiculo[]>(obterVeiculos);
+  const { usuario } = useContext(AuthContext);
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [carregandoVeiculos, setCarregandoVeiculos] = useState(true);
   const [veiculoEditando, setVeiculoEditando] = useState<number | null>(null);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [modelo, setModelo] = useState('');
   const [placa, setPlaca] = useState('');
   const [cor, setCor] = useState('');
+
+  useEffect(() => {
+    let montado = true;
+
+    async function carregarVeiculos() {
+      try {
+        const veiculosDoBackend = await listarVeiculos(usuario.token);
+        if (montado) setVeiculos(veiculosDoBackend);
+      } catch {
+        if (montado) setVeiculos(obterVeiculos());
+      } finally {
+        if (montado) setCarregandoVeiculos(false);
+      }
+    }
+
+    carregarVeiculos();
+
+    return () => {
+      montado = false;
+    };
+  }, [usuario.token]);
 
   function cadastrarVeiculo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,7 +108,9 @@ export function Veiculos() {
             <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-black">{veiculos.length}</span>
           </div>
           <div className="space-y-3 p-6">
-            {veiculos.length === 0 ? (
+            {carregandoVeiculos ? (
+              <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Carregando veículos...</p>
+            ) : veiculos.length === 0 ? (
               <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Nenhum veículo cadastrado.</p>
             ) : veiculos.map((veiculo) => (
               <div key={veiculo.id} className="flex flex-col gap-4 rounded-xl border border-[#E2DDD3] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">

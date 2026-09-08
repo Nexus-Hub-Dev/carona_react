@@ -1,26 +1,56 @@
-import { useContext, useState, useMemo } from 'react';
+import { useContext, useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Car, Clock, GenderFemale, MapPin, Wheelchair } from '@phosphor-icons/react';
 import { ToastAlerta } from '../../utils/ToastAlerta';
-import { obterVeiculos } from '../../utils/veiculos';
 import type { Veiculo } from '../../models/Veiculo';
-import { cadastrarViagem, calcularRota, type CalculoRota } from '../../services/Service';
+import { cadastrarViagem, calcularRota, listarVeiculos, type CalculoRota } from '../../services/Service';
 import { AuthContext } from '../../contexts/AuthContext';
 
 // Interfaces de apoio para integração com Back-end/Front-end
 export function CriarCarona() {
   const navigate = useNavigate();
   const { usuario } = useContext(AuthContext);
-  const [veiculos] = useState<Veiculo[]>(obterVeiculos);
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
 
-  // Busca o veículo ativo atual
-  const veiculoAtivo = useMemo(() => veiculos.find((v) => v.ativo), [veiculos]);
+  useEffect(() => {
+    let montado = true;
+
+    async function carregarVeiculos() {
+      try {
+        const veiculosDoBackend = await listarVeiculos(usuario.token);
+        if (montado) setVeiculos(veiculosDoBackend);
+      } catch {
+        if (montado) setVeiculos([]);
+      }
+    }
+
+    carregarVeiculos();
+
+    return () => {
+      montado = false;
+    };
+  }, [usuario.token]);
+
+  const veiculoAtivo = useMemo(() => veiculos.find((v) => v.ativo) ?? veiculos[0], [veiculos]);
+  const [veiculoSelecionadoId, setVeiculoSelecionadoId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (veiculoAtivo && !veiculos.some((veiculo) => veiculo.id === veiculoSelecionadoId)) {
+      setVeiculoSelecionadoId(veiculoAtivo.id);
+    }
+  }, [veiculos, veiculoAtivo, veiculoSelecionadoId]);
+
+  const veiculoSelecionado = veiculos.find((veiculo) => veiculo.id === veiculoSelecionadoId) ?? veiculoAtivo;
 
   // Estados dos campos do Formulário
   const [origem, setOrigem] = useState('');
   const [bairroOrigem, setBairroOrigem] = useState('');
   const [destino, setDestino] = useState('');
   const [bairroDestino, setBairroDestino] = useState('');
+  const [dataSaida, setDataSaida] = useState(() => {
+    const hoje = new Date();
+    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+  });
   const [horarioSaida, setHorarioSaida] = useState('');
   const [vagasDisponiveis, setVagasDisponiveis] = useState(3);
   const [calculoRota, setCalculoRota] = useState<CalculoRota | null>(null);
@@ -55,35 +85,80 @@ export function CriarCarona() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!veiculoAtivo) {
+    if (!veiculoSelecionado) {
       ToastAlerta('Você precisa cadastrar e ativar um veículo para oferecer caronas.', 'erro');
       return;
     }
 
-    if (!origem || !destino || !horarioSaida || !precoDigitado || !calculoRota) {
-      ToastAlerta('Preencha todos os campos obrigatórios da rota!', 'erro');
+    if (!origem || !destino || !dataSaida || !horarioSaida || !precoDigitado) {
+      ToastAlerta('Preencha a origem, o destino, a data, o horário e o valor da viagem!', 'erro');
       return;
     }
 
-    const dataViagem = new Date();
-    const [hora, minuto] = horarioSaida.split(':').map(Number);
-    dataViagem.setHours(hora, minuto, 0, 0);
+    const valor = Number(precoDigitado);
+
+    if (!usuario.id || !veiculoSelecionado.id) {
+      ToastAlerta('Usuário ou veículo inválido. Atualize os dados e tente novamente.', 'erro');
+      return;
+    }
+
+    if (!Number.isFinite(valor) || valor <= 0) {
+      ToastAlerta('Informe um valor de viagem maior que zero.', 'erro');
+      return;
+    }
+
+    const dataHoraViagem = new Date(`${dataSaida}T${horarioSaida}:00`);
+    if (Number.isNaN(dataHoraViagem.getTime()) || dataHoraViagem < new Date()) {
+      ToastAlerta('A data e o horário da viagem devem ser atuais ou futuros.', 'erro');
+      return;
+    }
+
+    if (apenasMulheres && usuario.genero && usuario.genero.toLowerCase() !== 'feminino') {
+      ToastAlerta('Apenas motoristas do gênero feminino podem criar viagens somente para mulheres.', 'erro');
+      return;
+    }
+
+    if (acessivelPcd && veiculoSelecionado.acessivelPcd !== true) {
+      ToastAlerta('O veículo selecionado não está cadastrado como acessível para PCD.', 'erro');
+      return;
+    }
 
     const novaCorrida = {
       partida: origem,
       destino,
-      data: dataViagem.toISOString(),
-      valorTotal: parseFloat(precoDigitado),
-      valorSugerido: calculoRota.valorSugerido,
+      data: `${dataSaida}T${horarioSaida}:00`,
+      disponivelPCD: acessivelPcd,
       apenasMulheres,
+      valorSugerido: valor,
+      usuario: {
+        id: usuario.id,
+      },
+      veiculo: {
+        id: veiculoSelecionado.id,
+      },
     };
 
     try {
       await cadastrarViagem(novaCorrida, usuario.token);
       ToastAlerta('Carona cadastrada e publicada com sucesso!', 'sucesso');
       navigate('/caronas');
-    } catch {
-      ToastAlerta('Não foi possível publicar a carona. Verifique os dados e tente novamente.', 'erro');
+    } catch (error: any) {
+      const dadosErro = error?.response?.data;
+      const erros = dadosErro?.errors;
+      const mensagemErros = Array.isArray(erros)
+        ? erros.map((item: any) => item?.defaultMessage || item?.message || item).join(', ')
+        : typeof erros === 'object' && erros !== null
+          ? Object.values(erros).join(', ')
+          : erros;
+      const mensagem = typeof dadosErro === 'string'
+        ? dadosErro
+        : mensagemErros || dadosErro?.message || dadosErro?.error || dadosErro?.detail;
+      console.error('Erro ao cadastrar carona:', {
+        status: error?.response?.status,
+        resposta: dadosErro,
+        payload: novaCorrida,
+      });
+      ToastAlerta(mensagem || 'Não foi possível publicar a carona. Verifique os dados e tente novamente.', 'erro');
       return;
     }
 
@@ -92,6 +167,7 @@ export function CriarCarona() {
     setBairroOrigem('');
     setDestino('');
     setBairroDestino('');
+    setDataSaida('');
     setHorarioSaida('');
     setPrecoDigitado('');
     setCalculoRota(null);
@@ -111,12 +187,12 @@ export function CriarCarona() {
         </div>
 
         {/* ALERTA: SEM VEÍCULO ATIVO */}
-        {!veiculoAtivo ? (
+        {veiculos.length === 0 ? (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center space-y-3">
             <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
               ⚠️
             </div>
-            <h2 className="text-lg font-bold text-red-900">Nenhum Veículo Ativo Encontrado</h2>
+            <h2 className="text-lg font-bold text-red-900">Nenhum Veículo Cadastrado</h2>
             <p className="text-xs text-red-700 max-w-md mx-auto">
               Para publicar uma carona no CORA, você precisa ter ao menos um veículo cadastrado e ativado no seu perfil.
             </p>
@@ -128,31 +204,29 @@ export function CriarCarona() {
             </button>
           </div>
         ) : (
-          /* CARD DE VEÍCULO ATIVO SELECIONADO */
-          <div className="overflow-hidden rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] shadow-[0_12px_30px_rgba(10,10,10,0.08)]">
-            <div className="flex items-center justify-between gap-3 border-b border-[#E2DDD3] bg-[#EFECE6] px-5 py-3">
-              <div className="flex items-center gap-2 text-black">
-                <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-black bg-white">
-                  <span className="text-sm font-black text-emerald-600">✓</span>
-                </span>
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.14em]">Veículo ativo</span>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-black">Pronto para publicar</span>
+          <div className="overflow-hidden rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] shadow-sm">
+            <div className="border-b border-[#E2DDD3] px-5 py-3">
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-black">Selecione o veículo da viagem</span>
             </div>
-            <div className="flex flex-col gap-4 bg-[#FAF8F5] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-black text-white">
-                  <Car size={25} weight="fill" aria-hidden="true" />
-                </span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Carro selecionado</p>
-                  <p className="mt-1 text-lg font-black tracking-tight text-black">{veiculoAtivo.modelo}</p>
-                </div>
-              </div>
-              <div className="sm:text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Placa</p>
-                <span className="mt-1 inline-block rounded-lg bg-white px-3 py-1.5 text-sm font-extrabold tracking-wider text-black shadow-sm">{veiculoAtivo.placa}</span>
-              </div>
+            <div className="grid gap-3 bg-[#FAF8F5] p-5 sm:grid-cols-2">
+              {veiculos.map((veiculo) => (
+                <button
+                  key={veiculo.id}
+                  type="button"
+                  onClick={() => setVeiculoSelecionadoId(veiculo.id)}
+                  aria-pressed={veiculo.id === veiculoSelecionadoId}
+                  className={`flex items-center justify-between rounded-xl border p-3 text-left transition ${veiculo.id === veiculoSelecionadoId ? 'border-black bg-black text-white' : 'border-[#E2DDD3] bg-white text-black hover:border-black'}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Car size={24} weight="fill" aria-hidden="true" />
+                    <span>
+                      <span className="block text-sm font-black">{veiculo.modelo}</span>
+                      <span className={`block text-[10px] font-bold uppercase tracking-wider ${veiculo.id === veiculoSelecionadoId ? 'text-gray-300' : 'text-gray-500'}`}>{veiculo.placa}</span>
+                    </span>
+                  </span>
+                  {veiculo.id === veiculoSelecionadoId && <span className="text-xs font-black">Selecionado</span>}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -239,6 +313,19 @@ export function CriarCarona() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
+                    Data da Viagem *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={dataSaida}
+                    onChange={(e) => setDataSaida(e.target.value)}
+                    className="w-full bg-transparent text-sm font-bold text-black focus:outline-none mt-1"
+                  />
+                </div>
+
+                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
+                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Horário de Saída *
                   </label>
                   <input
@@ -296,7 +383,7 @@ export function CriarCarona() {
                   min="0.01"
                   step="0.01"
                   required
-                  placeholder="Calculado pela API"
+                  placeholder="Informe o valor da viagem"
                   value={precoDigitado}
                   onChange={(e) => setPrecoDigitado(e.target.value)}
                   className={`w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-2 text-sm font-bold outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100 ${
@@ -309,7 +396,7 @@ export function CriarCarona() {
                           : 'text-emerald-600'
                   }`}
                 />
-                <p className="mt-2 text-xs text-gray-600">Valor sugerido pela API. Até 30% acima fica em amarelo; acima disso fica em vermelho.</p>
+                <p className="mt-2 text-xs text-gray-600">Informe o valor manualmente. Se os endereços forem preenchidos, uma sugestão será exibida automaticamente, mas não é obrigatória.</p>
                 {calculandoRota && <p className="mt-3 text-xs font-bold text-gray-600">Calculando rota...</p>}
                 {erroCalculoRota && <p className="mt-3 text-xs font-bold text-red-600">{erroCalculoRota}</p>}
                 {calculoRota && (
@@ -348,8 +435,8 @@ export function CriarCarona() {
                   type="button"
                   onClick={() => setApenasMulheres(!apenasMulheres)}
                   aria-pressed={apenasMulheres}
-                  className={`flex items-center gap-3 rounded-xl border border-[#831843] bg-[#831843] p-3 text-left text-white transition-all hover:bg-[#70203b] ${
-                    apenasMulheres ? 'shadow-[0_0_0_3px_rgba(131,24,67,0.25)]' : 'opacity-90'
+                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                    apenasMulheres ? 'border-[#831843] bg-[#831843] text-white shadow-[0_0_0_3px_rgba(131,24,67,0.25)] hover:bg-[#70203b]' : 'border-[#E2DDD3] bg-white text-black hover:border-[#831843]'
                   }`}
                 >
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">
@@ -365,8 +452,8 @@ export function CriarCarona() {
                   type="button"
                   onClick={() => setAcessivelPcd(!acessivelPcd)}
                   aria-pressed={acessivelPcd}
-                  className={`flex items-center gap-3 rounded-xl border border-[#1e3a8a] bg-[#1e3a8a] p-3 text-left text-white transition-all hover:bg-[#183273] ${
-                    acessivelPcd ? 'shadow-[0_0_0_3px_rgba(30,58,138,0.25)]' : 'opacity-90'
+                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                    acessivelPcd ? 'border-[#1e3a8a] bg-[#1e3a8a] text-white shadow-[0_0_0_3px_rgba(30,58,138,0.25)] hover:bg-[#183273]' : 'border-[#E2DDD3] bg-white text-black hover:border-[#1e3a8a]'
                   }`}
                 >
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">

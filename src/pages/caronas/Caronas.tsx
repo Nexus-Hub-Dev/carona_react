@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ToastAlerta } from '../../utils/ToastAlerta';
 import { obterVeiculos } from '../../utils/veiculos';
+import { listarViagens } from '../../services/Service';
+import { AuthContext } from '../../contexts/AuthContext';
 
 // Interface compatível com o Schema da API e com suporte aos dados visuais do front
 interface ViagemVisual {
@@ -115,13 +117,68 @@ const INITIAL_VIAGENS: ViagemVisual[] = [
 
 export function Caronas() {
   const navigate = useNavigate();
+  const { usuario } = useContext(AuthContext);
   const [viagens, setViagens] = useState<ViagemVisual[]>(INITIAL_VIAGENS);
+  const [carregandoViagens, setCarregandoViagens] = useState(true);
   const [mostrarAlertaVeiculo, setMostrarAlertaVeiculo] = useState(false);
   const [pontoPartida, setPontoPartida] = useState('');
   const [destinoFinal, setDestinoFinal] = useState('');
   const [periodo, setPeriodo] = useState<'Manhã' | 'Tarde' | 'Noite' | 'Todos'>('Todos');
   const [filtroApenasMulheres, setFiltroApenasMulheres] = useState(false);
   const [filtroPcd, setFiltroPcd] = useState(false);
+
+  useEffect(() => {
+    let montado = true;
+
+    async function carregarViagens() {
+      try {
+        const viagensApi = await listarViagens(usuario.token);
+        const viagensFormatadas: ViagemVisual[] = viagensApi.map((viagem) => {
+          const data = viagem.data ? new Date(viagem.data) : null;
+          const tempoMinutos = Number(viagem.tempoEstimadoMin ?? 0);
+          const chegada = data ? new Date(data.getTime() + tempoMinutos * 60_000) : null;
+
+          return {
+            id: viagem.id,
+            motoristaNome: viagem.usuario?.nome ?? 'Motorista',
+            motoristaFoto: viagem.usuario?.foto ?? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+            avaliacao: 0,
+            totalCaronas: 0,
+            badge: '',
+            veiculoModelo: viagem.veiculo?.modelo ?? 'Veículo não informado',
+            veiculoPlaca: viagem.veiculo?.placa ?? '',
+            origem: viagem.partida,
+            destino: viagem.destino,
+            horarioSaida: data ? data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+            horarioChegada: chegada ? chegada.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+            distanciaKm: Number(viagem.distanciaKm ?? 0),
+            tempoMinutos,
+            velocidadeMedia: Number(viagem.velocidadeMedia ?? 0),
+            preco: Number(viagem.valorSugerido ?? viagem.valorTotal ?? 0),
+            vagasDisponiveis: Number(viagem.vagasDisponiveis ?? 1),
+            apenasMulheres: viagem.apenasMulheres,
+            acessivelPcd: viagem.disponivelPCD,
+            latitudePartida: viagem.latitudePartida,
+            longitudePartida: viagem.longitudePartida,
+            latitudeDestino: viagem.latitudeDestino,
+            longitudeDestino: viagem.longitudeDestino,
+          };
+        });
+
+        if (montado) setViagens(viagensFormatadas);
+      } catch {
+        if (montado) ToastAlerta('Não foi possível carregar as caronas cadastradas.', 'erro');
+      } finally {
+        if (montado) setCarregandoViagens(false);
+      }
+    }
+
+    carregarViagens();
+
+    return () => {
+      montado = false;
+    };
+  }, [usuario.token]);
 
   const handleReservar = (id: number) => {
     setViagens((prevViagens) =>
@@ -272,7 +329,11 @@ export function Caronas() {
         </div>
 
         <div className="flex flex-col gap-4 sm:gap-6">
-          {viagensFiltradas.length === 0 ? (
+          {carregandoViagens ? (
+            <div className="text-center py-12 bg-[#EFECE6] rounded-2xl border border-[#E2DDD3] text-gray-600 font-semibold px-4 text-sm">
+              Carregando caronas cadastradas...
+            </div>
+          ) : viagensFiltradas.length === 0 ? (
             <div className="text-center py-12 bg-[#EFECE6] rounded-2xl border border-[#E2DDD3] text-gray-600 font-semibold px-4 text-sm">
               Nenhuma carona encontrada com os filtros selecionados.
             </div>
