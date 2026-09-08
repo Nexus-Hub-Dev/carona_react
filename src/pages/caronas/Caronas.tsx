@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ToastAlerta } from '../../utils/ToastAlerta';
 import { obterVeiculos } from '../../utils/veiculos';
+import { atualizarViagem, listarViagens, removerViagem } from '../../services/Service';
+import { AuthContext } from '../../contexts/AuthContext';
 
 // Interface compatível com o Schema da API e com suporte aos dados visuais do front
 interface ViagemVisual {
@@ -27,6 +29,8 @@ interface ViagemVisual {
   vagasDisponiveis: number;
   apenasMulheres?: boolean;
   acessivelPcd?: boolean;
+  usuarioId?: number;
+  veiculoId?: number;
   // Campos prontos para integração com o Back-end
   partida?: string;
   data?: string;
@@ -115,13 +119,143 @@ const INITIAL_VIAGENS: ViagemVisual[] = [
 
 export function Caronas() {
   const navigate = useNavigate();
+  const { usuario } = useContext(AuthContext);
   const [viagens, setViagens] = useState<ViagemVisual[]>(INITIAL_VIAGENS);
+  const [carregandoViagens, setCarregandoViagens] = useState(true);
   const [mostrarAlertaVeiculo, setMostrarAlertaVeiculo] = useState(false);
   const [pontoPartida, setPontoPartida] = useState('');
   const [destinoFinal, setDestinoFinal] = useState('');
   const [periodo, setPeriodo] = useState<'Manhã' | 'Tarde' | 'Noite' | 'Todos'>('Todos');
   const [filtroApenasMulheres, setFiltroApenasMulheres] = useState(false);
   const [filtroPcd, setFiltroPcd] = useState(false);
+  const [viagemEditando, setViagemEditando] = useState<ViagemVisual | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [editarOrigem, setEditarOrigem] = useState('');
+  const [editarDestino, setEditarDestino] = useState('');
+  const [editarData, setEditarData] = useState('');
+  const [editarHorario, setEditarHorario] = useState('');
+  const [editarPreco, setEditarPreco] = useState('');
+  const [editarApenasMulheres, setEditarApenasMulheres] = useState(false);
+  const [editarAcessivelPcd, setEditarAcessivelPcd] = useState(false);
+
+  useEffect(() => {
+    let montado = true;
+
+    async function carregarViagens() {
+      try {
+        const viagensApi = await listarViagens(usuario.token);
+        const viagensFormatadas: ViagemVisual[] = viagensApi.map((viagem) => {
+          const data = viagem.data ? new Date(viagem.data) : null;
+          const tempoMinutos = Number(viagem.tempoEstimadoMin ?? 0);
+          const chegada = data ? new Date(data.getTime() + tempoMinutos * 60_000) : null;
+
+          return {
+            id: viagem.id,
+            motoristaNome: viagem.usuario?.nome ?? 'Motorista',
+            motoristaFoto: viagem.usuario?.foto ?? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+            avaliacao: 0,
+            totalCaronas: 0,
+            badge: '',
+            veiculoModelo: viagem.veiculo?.modelo ?? 'Veículo não informado',
+            veiculoPlaca: viagem.veiculo?.placa ?? '',
+            origem: viagem.partida,
+            destino: viagem.destino,
+            horarioSaida: data ? data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+            horarioChegada: chegada ? chegada.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+            distanciaKm: Number(viagem.distanciaKm ?? 0),
+            tempoMinutos,
+            velocidadeMedia: Number(viagem.velocidadeMedia ?? 0),
+            preco: Number(viagem.valorSugerido ?? viagem.valorTotal ?? 0),
+            vagasDisponiveis: Number(viagem.vagasDisponiveis ?? 1),
+            apenasMulheres: viagem.apenasMulheres,
+            acessivelPcd: viagem.disponivelPCD,
+            latitudePartida: viagem.latitudePartida,
+            longitudePartida: viagem.longitudePartida,
+            latitudeDestino: viagem.latitudeDestino,
+            longitudeDestino: viagem.longitudeDestino,
+            usuarioId: viagem.usuario?.id,
+            veiculoId: viagem.veiculo?.id,
+          };
+        });
+
+        if (montado) setViagens(viagensFormatadas);
+      } catch {
+        if (montado) ToastAlerta('Não foi possível carregar as caronas cadastradas.', 'erro');
+      } finally {
+        if (montado) setCarregandoViagens(false);
+      }
+    }
+
+    carregarViagens();
+
+    return () => {
+      montado = false;
+    };
+  }, [usuario.token]);
+
+  function abrirEdicao(viagem: ViagemVisual) {
+    if (!viagem.usuarioId || viagem.usuarioId !== usuario.id) return;
+    const dataViagem = viagem.data ? new Date(viagem.data) : new Date();
+    setViagemEditando(viagem);
+    setEditarOrigem(viagem.origem);
+    setEditarDestino(viagem.destino);
+    setEditarData(viagem.data ? dataViagem.toISOString().slice(0, 10) : '');
+    setEditarHorario(viagem.data ? dataViagem.toTimeString().slice(0, 5) : viagem.horarioSaida);
+    setEditarPreco(String(viagem.preco));
+    setEditarApenasMulheres(viagem.apenasMulheres === true);
+    setEditarAcessivelPcd(viagem.acessivelPcd === true);
+  }
+
+  async function salvarEdicao(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!viagemEditando) return;
+
+    const dataHora = new Date(`${editarData}T${editarHorario}:00`);
+    const valor = Number(editarPreco);
+    if (Number.isNaN(dataHora.getTime()) || dataHora < new Date() || !Number.isFinite(valor) || valor <= 0) {
+      ToastAlerta('Informe uma data futura e um valor válido.', 'erro');
+      return;
+    }
+
+    setEditando(true);
+    try {
+      await atualizarViagem({
+        id: viagemEditando.id,
+        partida: editarOrigem.trim(),
+        destino: editarDestino.trim(),
+        data: `${editarData}T${editarHorario}:00`,
+        disponivelPCD: editarAcessivelPcd,
+        apenasMulheres: editarApenasMulheres,
+        valorSugerido: valor,
+        usuario: { id: viagemEditando.usuarioId },
+        veiculo: { id: viagemEditando.veiculoId },
+      }, usuario.token);
+      setViagens((viagensAtuais) => viagensAtuais.map((viagem) => viagem.id === viagemEditando.id
+        ? { ...viagem, origem: editarOrigem.trim(), destino: editarDestino.trim(), horarioSaida: editarHorario, preco: valor, apenasMulheres: editarApenasMulheres, acessivelPcd: editarAcessivelPcd }
+        : viagem));
+      setViagemEditando(null);
+      ToastAlerta('Carona atualizada com sucesso!', 'sucesso');
+    } catch (error: any) {
+      const mensagem = error?.response?.data?.message || error?.response?.data?.error;
+      ToastAlerta(mensagem || 'Não foi possível editar a carona.', 'erro');
+    } finally {
+      setEditando(false);
+    }
+  }
+
+  async function excluirCarona(viagem: ViagemVisual) {
+    if (viagem.usuarioId !== usuario.id) return;
+    if (!window.confirm('Deseja realmente excluir esta carona?')) return;
+
+    try {
+      await removerViagem(viagem.id, usuario.token);
+      setViagens((viagensAtuais) => viagensAtuais.filter((item) => item.id !== viagem.id));
+      ToastAlerta('Carona excluída com sucesso!', 'sucesso');
+    } catch (error: any) {
+      const mensagem = error?.response?.data?.message || error?.response?.data?.error;
+      ToastAlerta(mensagem || 'Não foi possível excluir a carona.', 'erro');
+    }
+  }
 
   const handleReservar = (id: number) => {
     setViagens((prevViagens) =>
@@ -272,7 +406,11 @@ export function Caronas() {
         </div>
 
         <div className="flex flex-col gap-4 sm:gap-6">
-          {viagensFiltradas.length === 0 ? (
+          {carregandoViagens ? (
+            <div className="text-center py-12 bg-[#EFECE6] rounded-2xl border border-[#E2DDD3] text-gray-600 font-semibold px-4 text-sm">
+              Carregando caronas cadastradas...
+            </div>
+          ) : viagensFiltradas.length === 0 ? (
             <div className="text-center py-12 bg-[#EFECE6] rounded-2xl border border-[#E2DDD3] text-gray-600 font-semibold px-4 text-sm">
               Nenhuma carona encontrada com os filtros selecionados.
             </div>
@@ -405,12 +543,59 @@ export function Caronas() {
                   >
                     Reservar →
                   </button>
+                  {viagem.usuarioId === usuario.id && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => abrirEdicao(viagem)}
+                        className="w-auto lg:w-full rounded-xl border border-gray-300 px-5 py-2.5 text-xs font-bold text-gray-800 transition hover:bg-gray-100"
+                      >
+                        Editar carona
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => excluirCarona(viagem)}
+                        className="w-auto lg:w-full rounded-xl border border-red-200 px-5 py-2.5 text-xs font-bold text-red-700 transition hover:bg-red-50"
+                      >
+                        Excluir carona
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))
           )}
         </div>
       </section>
+
+      {viagemEditando && (
+        <div className="fixed inset-0 z-60 grid place-items-center bg-black/55 px-4" role="dialog" aria-modal="true" aria-labelledby="editar-carona-titulo">
+          <form onSubmit={salvarEdicao} className="w-full max-w-lg space-y-4 rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Minhas caronas</p>
+                <h2 id="editar-carona-titulo" className="mt-1 text-2xl font-black text-black">Editar carona</h2>
+              </div>
+              <button type="button" onClick={() => setViagemEditando(null)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-full text-xl text-gray-500 hover:bg-white hover:text-black">×</button>
+            </div>
+            <label className="block text-sm font-bold text-black">Partida<input required minLength={3} value={editarOrigem} onChange={(event) => setEditarOrigem(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+            <label className="block text-sm font-bold text-black">Destino<input required minLength={3} value={editarDestino} onChange={(event) => setEditarDestino(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm font-bold text-black">Data<input required type="date" value={editarData} onChange={(event) => setEditarData(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+              <label className="block text-sm font-bold text-black">Horário<input required type="time" value={editarHorario} onChange={(event) => setEditarHorario(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+            </div>
+            <label className="block text-sm font-bold text-black">Valor por assento<input required min="0.01" step="0.01" type="number" value={editarPreco} onChange={(event) => setEditarPreco(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+            <div className="flex flex-wrap gap-4 text-sm font-bold text-black">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={editarApenasMulheres} onChange={(event) => setEditarApenasMulheres(event.target.checked)} /> Apenas mulheres</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={editarAcessivelPcd} onChange={(event) => setEditarAcessivelPcd(event.target.checked)} /> Acessível para PCD</label>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button type="submit" disabled={editando} className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-wait disabled:opacity-60">{editando ? 'Salvando...' : 'Salvar alterações'}</button>
+              <button type="button" onClick={() => setViagemEditando(null)} className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-white">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* SEÇÃO INFORMATIVA */}
       <section className="max-w-6xl mx-auto mt-12 sm:mt-20 px-4">

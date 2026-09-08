@@ -3,6 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import type { Veiculo } from '../../models/Veiculo';
 import { salvarVeiculos, obterVeiculos } from '../../utils/veiculos';
+import { atualizarVeiculo, cadastrarVeiculo as cadastrarVeiculoApi, listarVeiculos, removerVeiculo as removerVeiculoApi } from '../../services/Service';
+import { AuthContext } from '../../contexts/AuthContext';
+import { ToastAlerta } from '../../utils/ToastAlerta';
 import { cadastrarVeiculo as cadastrarVeiculoApi, atualizarVeiculo as atualizarVeiculoApi, listarVeiculos, removerVeiculo as removerVeiculoApi } from '../../services/Service';
 import { AuthContext } from '../../contexts/AuthContext';
 import { ToastAlerta } from '../../utils/ToastAlerta';
@@ -27,6 +30,7 @@ export function Veiculos() {
   const location = useLocation();
   const { usuario } = useContext(AuthContext);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [carregandoVeiculos, setCarregandoVeiculos] = useState(true);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
@@ -36,6 +40,84 @@ export function Veiculos() {
   const [placa, setPlaca] = useState('');
   const [foto, setFoto] = useState('');
   const [cor, setCor] = useState('');
+  const [foto, setFoto] = useState('');
+  const [capacidade, setCapacidade] = useState(1);
+  const [acessivelPcd, setAcessivelPcd] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    let montado = true;
+
+    async function carregarVeiculos() {
+      try {
+        const veiculosDoBackend = await listarVeiculos(usuario.token);
+        if (montado) setVeiculos(veiculosDoBackend);
+      } catch {
+        if (montado) setVeiculos(obterVeiculos());
+      } finally {
+        if (montado) setCarregandoVeiculos(false);
+      }
+    }
+
+    carregarVeiculos();
+
+    return () => {
+      montado = false;
+    };
+  }, [usuario.token]);
+
+  async function cadastrarVeiculo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const modeloNormalizado = modelo.trim();
+    const placaNormalizada = placa.trim().toUpperCase().replace('-', '');
+    const corNormalizada = cor.trim();
+
+    if (modeloNormalizado.length < 5) {
+      ToastAlerta('O modelo deve ter pelo menos 5 caracteres.', 'erro');
+      return;
+    }
+    if (!/^[A-Z]{3}[0-9]{4}$/.test(placaNormalizada) && !/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(placaNormalizada)) {
+      ToastAlerta('Informe uma placa válida, como ABC1234 ou ABC1D23.', 'erro');
+      return;
+    }
+    const placaJaCadastrada = veiculos.some((veiculo) =>
+      veiculo.placa.replace('-', '').toUpperCase() === placaNormalizada && veiculo.id !== veiculoEditando,
+    );
+    if (placaJaCadastrada) {
+      ToastAlerta('Já existe um veículo cadastrado com essa placa.', 'erro');
+      return;
+    }
+    if (corNormalizada.length < 3) {
+      ToastAlerta('A cor deve ter pelo menos 3 caracteres.', 'erro');
+      return;
+    }
+    if (!Number.isInteger(capacidade) || capacidade < 1) {
+      ToastAlerta('A capacidade deve ser de pelo menos 1 pessoa.', 'erro');
+      return;
+    }
+
+    setSalvando(true);
+
+    const dados = {
+      modelo: modeloNormalizado,
+      placa: placaNormalizada,
+      cor: corNormalizada,
+      foto: foto.trim(),
+      capacidade,
+      acessivelPcd,
+    };
+
+    try {
+      const veiculoSalvo = veiculoEditando === null
+        ? await cadastrarVeiculoApi(dados, usuario.token)
+        : await atualizarVeiculo({
+          id: veiculoEditando,
+          ...dados,
+          ativo: veiculos.find((veiculo) => veiculo.id === veiculoEditando)?.ativo ?? false,
+        }, usuario.token);
+      const listaAtualizada = veiculoEditando === null
+        ? [...veiculos, veiculoSalvo]
   const [capacidade, setCapacidade] = useState(1);
   const [acessivelPcd, setAcessivelPcd] = useState(false);
 
@@ -76,12 +158,26 @@ export function Veiculos() {
 
       salvarVeiculos(listaAtualizada);
       setVeiculos(listaAtualizada);
+      ToastAlerta(veiculoEditando === null ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado com sucesso!', 'sucesso');
 
       const destinoDepoisDoCadastro = (location.state as { from?: string } | null)?.from;
       if (destinoDepoisDoCadastro) {
         navigate(destinoDepoisDoCadastro, { replace: true });
         return;
       }
+      limparFormulario();
+    } catch (error: any) {
+      const resposta = error?.response?.data;
+      const erros = resposta?.errors;
+      const mensagemErros = Array.isArray(erros)
+        ? erros.map((item: any) => item?.defaultMessage || item?.message || item).join(', ')
+        : typeof erros === 'object' && erros !== null
+          ? Object.values(erros).join(', ')
+          : undefined;
+      const mensagem = typeof resposta === 'string'
+        ? resposta
+        : mensagemErros || resposta?.message || resposta?.error || resposta?.detail;
+      ToastAlerta(mensagem || `Não foi possível salvar o veículo (${error?.response?.status ?? 'erro'}).`, 'erro');
 
       ToastAlerta(veiculoEditando === null ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado com sucesso!', 'sucesso');
       limparFormulario();
@@ -97,6 +193,7 @@ export function Veiculos() {
     setPlaca('');
     setFoto('');
     setCor('');
+    setFoto('');
     setCapacidade(1);
     setAcessivelPcd(false);
     setVeiculoEditando(null);
@@ -109,6 +206,9 @@ export function Veiculos() {
     setPlaca(veiculo.placa);
     setFoto(veiculo.foto);
     setCor(veiculo.cor);
+    setFoto(veiculo.foto ?? '');
+    setCapacidade(veiculo.capacidade ?? 1);
+    setAcessivelPcd(veiculo.acessivelPcd ?? false);
     setCapacidade(veiculo.capacidade);
     setAcessivelPcd(veiculo.acessivelPcd);
     setMostrarModal(true);
@@ -117,6 +217,15 @@ export function Veiculos() {
   async function removerVeiculo(id: number) {
     if (!window.confirm('Deseja realmente remover este veículo?')) return;
 
+    removerVeiculoApi(id, usuario.token)
+      .then(() => {
+        const listaAtualizada = veiculos.filter((veiculo) => veiculo.id !== id);
+        salvarVeiculos(listaAtualizada);
+        setVeiculos(listaAtualizada);
+        if (veiculoEditando === id) limparFormulario();
+        ToastAlerta('Veículo removido com sucesso!', 'sucesso');
+      })
+      .catch(() => ToastAlerta('Não foi possível remover o veículo.', 'erro'));
     try {
       await removerVeiculoApi(id, usuario.token);
       const listaAtualizada = veiculos.filter((veiculo) => veiculo.id !== id);
@@ -135,12 +244,16 @@ export function Veiculos() {
   }
 
   function alternarAtivo(id: number) {
-    const listaAtualizada = veiculos.map((veiculo) => ({
-      ...veiculo,
-      ativo: veiculo.id === id,
-    }));
-    salvarVeiculos(listaAtualizada);
-    setVeiculos(listaAtualizada);
+    const listaAtualizada = veiculos.map((veiculo) => ({ ...veiculo, ativo: veiculo.id === id }));
+    const veiculo = veiculos.find((item) => item.id === id);
+    if (!veiculo) return;
+
+    atualizarVeiculo({ ...veiculo, ativo: true }, usuario.token)
+      .then(() => {
+        salvarVeiculos(listaAtualizada);
+        setVeiculos(listaAtualizada);
+      })
+      .catch(() => ToastAlerta('Não foi possível ativar o veículo.', 'erro'));
   }
 
   return (
@@ -155,6 +268,8 @@ export function Veiculos() {
             <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-black">{veiculos.length}</span>
           </div>
           <div className="space-y-3 p-6">
+            {carregandoVeiculos ? (
+              <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Carregando veículos...</p>
             {carregando ? (
               <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Carregando veículos...</p>
             ) : erro ? (
@@ -163,10 +278,14 @@ export function Veiculos() {
               <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Nenhum veículo cadastrado.</p>
             ) : veiculos.map((veiculo) => (
               <div key={veiculo.id} className="flex flex-col gap-4 rounded-xl border border-[#E2DDD3] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+                <div className="flex items-center gap-3">
+                  {veiculo.foto && <img src={veiculo.foto} alt={`Foto do ${veiculo.modelo}`} className="h-14 w-14 rounded-xl object-cover" />}
+                  <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-black text-black">{veiculo.modelo}</h3>
                     {veiculo.ativo && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">ATIVO</span>}
+                  </div>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{veiculo.cor} · {veiculo.placa}</p>
                   </div>
                   <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{veiculo.cor} · {veiculo.placa} · {veiculo.capacidade} lugares</p>
                   {veiculo.acessivelPcd && <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">Acessível para PCD</p>}
@@ -201,6 +320,12 @@ export function Veiculos() {
               <label className="block text-sm font-bold text-black">Placa<input required maxLength={7} pattern="^[A-Z]{3}-?[0-9]{4}$|^[A-Z]{3}-?[0-9][A-Z][0-9]{2}$" value={placa} onChange={(event) => setPlaca(event.target.value.toUpperCase())} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal uppercase outline-none focus:border-black" placeholder="Ex: QXO2M22" /></label>
               <label className="block text-sm font-bold text-black">Foto (URL)<input type="url" value={foto} onChange={(event) => setFoto(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="https://..." /></label>
               <label className="block text-sm font-bold text-black">Cor<input required value={cor} onChange={(event) => setCor(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="Ex: Azul" /></label>
+              <label className="block text-sm font-bold text-black">Foto <span className="font-normal text-gray-500">(opcional)</span><input value={foto} onChange={(event) => setFoto(event.target.value)} type="url" className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="https://exemplo.com/carro.jpg" /></label>
+              <label className="block text-sm font-bold text-black">Capacidade<input required min="1" type="number" value={capacidade} onChange={(event) => setCapacidade(Number(event.target.value))} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+              <label className="flex items-center gap-2 text-sm font-bold text-black"><input type="checkbox" checked={acessivelPcd} onChange={(event) => setAcessivelPcd(event.target.checked)} className="h-4 w-4" /> Veículo acessível para PCD</label>
+            </div>
+            <div className="mt-6 flex gap-2">
+              <button type="submit" disabled={salvando} className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-wait disabled:opacity-60">{salvando ? 'Salvando...' : veiculoEditando === null ? 'Salvar veículo' : 'Salvar alterações'}</button>
               <label className="block text-sm font-bold text-black">Capacidade<input required type="number" min={1} value={capacidade} onChange={(event) => setCapacidade(Number(event.target.value))} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
               <label className="flex items-center gap-3 text-sm font-bold text-black"><input type="checkbox" checked={acessivelPcd} onChange={(event) => setAcessivelPcd(event.target.checked)} className="h-4 w-4 accent-black" /> Acessível para PCD</label>
             </div>

@@ -7,4 +7,7 @@ export interface Veiculo {
 	capacidade: number;
 	acessivelPcd: boolean;
 	ativo: boolean;
+	foto: string;
+	capacidade: number;
+	acessivelPcd: boolean;
 }

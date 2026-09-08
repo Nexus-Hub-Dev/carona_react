@@ -29,8 +29,35 @@ export const cadastrarViagem = async (dados: object, token: string) => {
     return resposta.data
 }
 
+export const atualizarViagem = async (dados: object, token: string) => {
+    const resposta = await api.put('/viagens', dados, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const removerViagem = async (id: number, token: string): Promise<void> => {
+    await api.delete(`/viagens/${id}`, {
+        headers: authorizationHeader(token)
+    })
+}
+
+export const listarViagens = async (token: string): Promise<any[]> => {
+    const resposta = await api.get('/viagens', {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
 export const atualizarUsuario = async (id: number, dados: object, token: string) => {
-    const resposta = await api.put(`/usuarios/${id}`, dados, {
+    const resposta = await api.put('/usuarios/atualizar', { id, ...dados }, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const buscarUsuario = async (id: number, token: string) => {
+    const resposta = await api.get(`/usuarios/${id}`, {
         headers: authorizationHeader(token)
     })
     return resposta.data
@@ -80,6 +107,11 @@ export const listarVeiculos = async (token: string): Promise<Veiculo[]> => {
     const resposta = await api.get('/veiculos', {
         headers: authorizationHeader(token)
     })
+    return resposta.data
+}
+
+export type DadosVeiculo = Omit<Veiculo, 'id' | 'ativo'>;
+
     return resposta.data;
 }
 
@@ -87,6 +119,7 @@ export const cadastrarVeiculo = async (dados: DadosVeiculo, token: string): Prom
     const resposta = await api.post('/veiculos', dados, {
         headers: authorizationHeader(token)
     })
+    return resposta.data
     return resposta.data;
 }
 
@@ -95,6 +128,10 @@ export const atualizarVeiculo = async (dados: Veiculo, token: string): Promise<V
     const resposta = await api.put('/veiculos', dadosApi, {
         headers: authorizationHeader(token)
     })
+    return resposta.data
+}
+
+export const removerVeiculo = async (id: number, token: string): Promise<void> => {
     return resposta.data;
 }
 

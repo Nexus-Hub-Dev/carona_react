@@ -9,6 +9,10 @@ import Cadastro from "./pages/cadastro/Cadastro"
 import { Caronas } from "./pages/caronas/Caronas"
 import { CriarCarona } from "./pages/caronas/CriarCaronas"
 import ContaPage from "./pages/conta/ContaPage"
+ 
+// Certifique-se de criar este componente na pasta indicada:
+import Sobre from "./pages/sobre/Sobre"
+ 
 import Home from "./pages/home/Home"
 import Login from "./pages/login/Login"
 import Perfil from "./pages/perfil/Perfil"
@@ -16,17 +20,68 @@ import Sobre from "./pages/sobre/Sobre"
 import Veiculos from "./pages/veiculos/Veiculos"
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-	const { usuario } = useContext(AuthContext)
-	const location = useLocation()
-
-	if (!usuario.token) {
-		return <Navigate to="/login" replace state={{ from: location }} />
-	}
-
-	return children
+  const { usuario } = useContext(AuthContext)
+  const location = useLocation()
+ 
+  if (!usuario?.token) {
+    return <Navigate to="/login" replace state={{ from: location }} />
+  }
+  return <>{children}</>
 }
-
+ 
 function AppContent() {
+  const { pathname } = useLocation()
+  const isAuthenticationPage = pathname === "/login" || pathname === "/cadastro"
+ 
+  return (
+    <div className="flex min-h-screen flex-col">
+      {!isAuthenticationPage && <Navbar />}
+     
+      <main className="flex flex-1 flex-col">
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/cadastro" element={<Cadastro />} />
+         
+          <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+          <Route path="/caronas" element={<ProtectedRoute><Caronas /></ProtectedRoute>} />
+          <Route path="/oferecer-carona" element={<ProtectedRoute><CriarCarona /></ProtectedRoute>} />
+          <Route path="/veiculos" element={<ProtectedRoute><Veiculos /></ProtectedRoute>} />
+          <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
+         
+          {/* NOVA ROTA ADICIONADA */}
+          <Route path="/sobre" element={<ProtectedRoute><Sobre /></ProtectedRoute>} />
+         
+          <Route
+            path="/historico-caronas"
+            element={
+              <ProtectedRoute>
+                <ContaPage
+                  titulo="Histórico de caronas"
+                  descricao="Consulte suas viagens oferecidas e reservadas."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dados-bancarios"
+            element={
+              <ProtectedRoute>
+                <ContaPage
+                  titulo="Dados bancários"
+                  descricao="Gerencie os dados usados para receber pelos seus trajetos."
+                />
+              </ProtectedRoute>
+            }
+          />
+         
+          <Route path="*" element={<ProtectedRoute><Navigate to="/home" replace /></ProtectedRoute>} />
+        </Routes>
+      </main>
+     
+      {!isAuthenticationPage && <Footer />}
+    </div>
+  )
 	const { pathname } = useLocation()
 	const isAuthenticationPage = pathname === "/login" || pathname === "/cadastro"
 
@@ -58,8 +113,16 @@ function AppContent() {
 		</div>
 	)
 }
-
+ 
 function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  )
+}
+ 
+export default App
 	return (
 		<AuthProvider>
 			<ToastContainer />
