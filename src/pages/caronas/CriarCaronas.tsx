@@ -44,9 +44,7 @@ export function CriarCarona() {
 
   // Estados dos campos do Formulário
   const [origem, setOrigem] = useState('');
-  const [bairroOrigem, setBairroOrigem] = useState('');
   const [destino, setDestino] = useState('');
-  const [bairroDestino, setBairroDestino] = useState('');
   const [dataSaida, setDataSaida] = useState(() => {
     const hoje = new Date();
     return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
@@ -164,9 +162,7 @@ export function CriarCarona() {
 
     // Limpar Formulário
     setOrigem('');
-    setBairroOrigem('');
     setDestino('');
-    setBairroDestino('');
     setDataSaida('');
     setHorarioSaida('');
     setPrecoDigitado('');
@@ -258,20 +254,6 @@ export function CriarCarona() {
                   />
                 </div>
 
-                {/* Bairro/Ponto de referência Partida */}
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
-                    Bairro / Ref. Partida
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Bela Vista (Em frente à Gazeta)"
-                    value={bairroOrigem}
-                    onChange={(e) => setBairroOrigem(e.target.value)}
-                    className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
-                  />
-                </div>
-
                 {/* Destino */}
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
@@ -288,19 +270,6 @@ export function CriarCarona() {
                   />
                 </div>
 
-                {/* Bairro/Ponto de referência Destino */}
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
-                    Bairro / Ref. Destino
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Itaim Bibi (Shopping Iguatemi)"
-                    value={bairroDestino}
-                    onChange={(e) => setBairroDestino(e.target.value)}
-                    className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
-                  />
-                </div>
               </div>
             </div>
 

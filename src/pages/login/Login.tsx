@@ -24,7 +24,10 @@ function Login() {
       return
     }
 
-    const authenticated = await handleLogin({ ...form, id: 0, nome: '', celular: '', foto: '', token: '' })
+    const authenticated = await handleLogin({
+      usuario: form.usuario.trim(),
+      senha: form.senha,
+    })
     if (authenticated) {
       navigate('/home', { replace: true })
     }

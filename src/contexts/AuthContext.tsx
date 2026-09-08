@@ -25,8 +25,8 @@ const sanitizeUsuario = (usuario: Partial<UsuarioLogin>): UsuarioLogin => ({
 //  Definir os Estados e Funções disponibilizadas pela Context
 interface AuthContextProps {
     usuario: UsuarioLogin
-    handleLogin(usuario: UsuarioLogin): Promise<boolean>
-    handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto'>): Promise<boolean>
+    handleLogin(usuario: Pick<UsuarioLogin, 'usuario' | 'senha'>): Promise<boolean>
+    handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto' | 'senha' | 'genero'>): Promise<boolean>
     handleLogout(): void
     isLoading: boolean
     isLogout: boolean
@@ -77,12 +77,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, [usuario])
 
     // Implementar a função handleLogin
-    async function handleLogin(usuarioLogin: UsuarioLogin): Promise<boolean> {
+    async function handleLogin(usuarioLogin: Pick<UsuarioLogin, 'usuario' | 'senha'>): Promise<boolean> {
 
         setIsLoading(true);
 
         try {
-            await login(`/usuarios/logar`, usuarioLogin, (dados: UsuarioLogin) => {
+            await login(`/usuarios/logar`, {
+                usuario: usuarioLogin.usuario.trim(),
+                senha: usuarioLogin.senha,
+            }, (dados: UsuarioLogin) => {
                 setUsuario(sanitizeUsuario(dados))
             })
             ToastAlerta("Usuário Autenticado com sucesso!", "sucesso")
@@ -118,7 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     }
 
-    async function handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto'>): Promise<boolean> {
+    async function handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto' | 'senha' | 'genero'>): Promise<boolean> {
         try {
             const usuarioAtualizado = await atualizarUsuario(usuario.id, dados, usuario.token)
             setUsuario(sanitizeUsuario({ ...usuario, ...usuarioAtualizado, ...dados, token: usuario.token }))

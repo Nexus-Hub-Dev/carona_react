@@ -29,6 +29,19 @@ export const cadastrarViagem = async (dados: object, token: string) => {
     return resposta.data
 }
 
+export const atualizarViagem = async (dados: object, token: string) => {
+    const resposta = await api.put('/viagens', dados, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const removerViagem = async (id: number, token: string): Promise<void> => {
+    await api.delete(`/viagens/${id}`, {
+        headers: authorizationHeader(token)
+    })
+}
+
 export const listarViagens = async (token: string): Promise<any[]> => {
     const resposta = await api.get('/viagens', {
         headers: authorizationHeader(token)
@@ -37,7 +50,14 @@ export const listarViagens = async (token: string): Promise<any[]> => {
 }
 
 export const atualizarUsuario = async (id: number, dados: object, token: string) => {
-    const resposta = await api.put(`/usuarios/${id}`, dados, {
+    const resposta = await api.put('/usuarios/atualizar', { id, ...dados }, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const buscarUsuario = async (id: number, token: string) => {
+    const resposta = await api.get(`/usuarios/${id}`, {
         headers: authorizationHeader(token)
     })
     return resposta.data

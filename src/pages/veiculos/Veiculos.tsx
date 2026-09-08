@@ -46,12 +46,41 @@ export function Veiculos() {
 
   async function cadastrarVeiculo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const modeloNormalizado = modelo.trim();
+    const placaNormalizada = placa.trim().toUpperCase().replace('-', '');
+    const corNormalizada = cor.trim();
+
+    if (modeloNormalizado.length < 5) {
+      ToastAlerta('O modelo deve ter pelo menos 5 caracteres.', 'erro');
+      return;
+    }
+    if (!/^[A-Z]{3}[0-9]{4}$/.test(placaNormalizada) && !/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(placaNormalizada)) {
+      ToastAlerta('Informe uma placa válida, como ABC1234 ou ABC1D23.', 'erro');
+      return;
+    }
+    const placaJaCadastrada = veiculos.some((veiculo) =>
+      veiculo.placa.replace('-', '').toUpperCase() === placaNormalizada && veiculo.id !== veiculoEditando,
+    );
+    if (placaJaCadastrada) {
+      ToastAlerta('Já existe um veículo cadastrado com essa placa.', 'erro');
+      return;
+    }
+    if (corNormalizada.length < 3) {
+      ToastAlerta('A cor deve ter pelo menos 3 caracteres.', 'erro');
+      return;
+    }
+    if (!Number.isInteger(capacidade) || capacidade < 1) {
+      ToastAlerta('A capacidade deve ser de pelo menos 1 pessoa.', 'erro');
+      return;
+    }
+
     setSalvando(true);
 
     const dados = {
-      modelo: modelo.trim(),
-      placa: placa.trim().toUpperCase(),
-      cor: cor.trim(),
+      modelo: modeloNormalizado,
+      placa: placaNormalizada,
+      cor: corNormalizada,
       foto: foto.trim(),
       capacidade,
       acessivelPcd,
@@ -80,8 +109,17 @@ export function Veiculos() {
       }
       limparFormulario();
     } catch (error: any) {
-      const mensagem = error?.response?.data?.message || error?.response?.data?.error;
-      ToastAlerta(mensagem || 'Não foi possível salvar o veículo. Verifique os dados e tente novamente.', 'erro');
+      const resposta = error?.response?.data;
+      const erros = resposta?.errors;
+      const mensagemErros = Array.isArray(erros)
+        ? erros.map((item: any) => item?.defaultMessage || item?.message || item).join(', ')
+        : typeof erros === 'object' && erros !== null
+          ? Object.values(erros).join(', ')
+          : undefined;
+      const mensagem = typeof resposta === 'string'
+        ? resposta
+        : mensagemErros || resposta?.message || resposta?.error || resposta?.detail;
+      ToastAlerta(mensagem || `Não foi possível salvar o veículo (${error?.response?.status ?? 'erro'}).`, 'erro');
     } finally {
       setSalvando(false);
     }
