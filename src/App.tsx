@@ -1,15 +1,15 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom"
+import { ToastContainer } from "react-toastify"
+import 'react-toastify/dist/ReactToastify.css'
 import Footer from "./components/footer/Footer"
 import Navbar from "./components/navbar/Navbar"
-import 'react-toastify/dist/ReactToastify.css'
-import { ToastContainer } from "react-toastify"
 import { AuthProvider } from "./contexts/AuthContext"
-import Home from "./pages/home/Home"
-import Sobre from "./pages/sobre/Sobre"
-import Login from "./pages/login/Login"
 import Cadastro from "./pages/cadastro/Cadastro"
 import { Caronas } from "./pages/caronas/Caronas"
 import { CriarCarona } from "./pages/caronas/CriarCaronas"
+import Home from "./pages/home/Home"
+import Login from "./pages/login/Login"
+import Sobre from "./pages/sobre/Sobre"
 
 function AppContent() {
 	const { pathname } = useLocation()

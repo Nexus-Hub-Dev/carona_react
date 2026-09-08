@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ToastAlerta } from '../../utils/ToastAlerta';
 
 // Interfaces de apoio para integração com Back-end/Front-end
