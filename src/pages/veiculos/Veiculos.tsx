@@ -1,4 +1,3 @@
-```tsx
 import { useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { FormEvent } from 'react';
@@ -722,4 +721,3 @@ export function Veiculos() {
 }
 
 export default Veiculos;
-```
