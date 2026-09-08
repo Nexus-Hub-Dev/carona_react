@@ -1,4 +1,3 @@
-import React from 'react';
 import { MapPin, ArrowRight, SteeringWheel, MapTrifold, RoadHorizon } from '@phosphor-icons/react';
 
 
