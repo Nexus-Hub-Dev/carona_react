@@ -1,41 +1,104 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import type { Veiculo } from '../../models/Veiculo';
 import { salvarVeiculos, obterVeiculos } from '../../utils/veiculos';
+import { cadastrarVeiculo as cadastrarVeiculoApi, atualizarVeiculo as atualizarVeiculoApi, listarVeiculos, removerVeiculo as removerVeiculoApi } from '../../services/Service';
+import { AuthContext } from '../../contexts/AuthContext';
+import { ToastAlerta } from '../../utils/ToastAlerta';
+
+function aplicarSelecaoLocal(veiculos: Omit<Veiculo, 'ativo'>[], veiculosSalvos: Veiculo[]): Veiculo[] {
+  const idAtivo = veiculosSalvos.find((veiculo) => veiculo.ativo)?.id;
+  return veiculos.map((veiculo, index) => ({
+    ...veiculo,
+    ativo: idAtivo === veiculo.id || (!idAtivo && index === 0),
+  }));
+}
+
+function adaptarVeiculoSalvo(veiculo: Veiculo & { adaptadoPCD?: boolean }): Veiculo {
+  return {
+    ...veiculo,
+    acessivelPcd: veiculo.acessivelPcd ?? veiculo.adaptadoPCD ?? false,
+  };
+}
 
 export function Veiculos() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [veiculos, setVeiculos] = useState<Veiculo[]>(obterVeiculos);
+  const { usuario } = useContext(AuthContext);
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
   const [veiculoEditando, setVeiculoEditando] = useState<number | null>(null);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [modelo, setModelo] = useState('');
   const [placa, setPlaca] = useState('');
+  const [foto, setFoto] = useState('');
   const [cor, setCor] = useState('');
+  const [capacidade, setCapacidade] = useState(1);
+  const [acessivelPcd, setAcessivelPcd] = useState(false);
 
-  function cadastrarVeiculo(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const listaAtualizada = veiculoEditando === null
-      ? [...veiculos, { id: Date.now(), modelo, placa, cor, ativo: veiculos.length === 0 }]
-      : veiculos.map((veiculo) => veiculo.id === veiculoEditando ? { ...veiculo, modelo, placa, cor } : veiculo);
+  useEffect(() => {
+    if (!usuario.token) return;
 
-    salvarVeiculos(listaAtualizada);
-    setVeiculos(listaAtualizada);
+    async function carregarVeiculos() {
+      setCarregando(true);
+      setErro('');
 
-    const destinoDepoisDoCadastro = (location.state as { from?: string } | null)?.from;
-    if (destinoDepoisDoCadastro) {
-      navigate(destinoDepoisDoCadastro, { replace: true });
-      return;
+      try {
+        const veiculosApi = await listarVeiculos(usuario.token);
+        const veiculosComSelecao = aplicarSelecaoLocal(veiculosApi.map(adaptarVeiculoSalvo), obterVeiculos().map(adaptarVeiculoSalvo));
+        setVeiculos(veiculosComSelecao);
+        salvarVeiculos(veiculosComSelecao);
+      } catch {
+        setErro('Não foi possível carregar seus veículos. Tente novamente.');
+      } finally {
+        setCarregando(false);
+      }
     }
 
-    limparFormulario();
+    void carregarVeiculos();
+  }, [usuario.token]);
+
+  async function cadastrarVeiculo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSalvando(true);
+
+    try {
+      const dados = { modelo: modelo.trim(), placa: placa.trim().toUpperCase(), foto: foto.trim(), cor: cor.trim(), capacidade, acessivelPcd };
+      const veiculoSalvo = veiculoEditando === null
+        ? await cadastrarVeiculoApi(dados, usuario.token)
+        : await atualizarVeiculoApi({ id: veiculoEditando, ...dados, ativo: veiculos.find((veiculo) => veiculo.id === veiculoEditando)?.ativo ?? false }, usuario.token);
+      const listaAtualizada = veiculoEditando === null
+        ? [...veiculos, { ...veiculoSalvo, ativo: veiculos.length === 0 }]
+        : veiculos.map((veiculo) => veiculo.id === veiculoEditando ? { ...veiculo, ...veiculoSalvo } : veiculo);
+
+      salvarVeiculos(listaAtualizada);
+      setVeiculos(listaAtualizada);
+
+      const destinoDepoisDoCadastro = (location.state as { from?: string } | null)?.from;
+      if (destinoDepoisDoCadastro) {
+        navigate(destinoDepoisDoCadastro, { replace: true });
+        return;
+      }
+
+      ToastAlerta(veiculoEditando === null ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado com sucesso!', 'sucesso');
+      limparFormulario();
+    } catch {
+      ToastAlerta('Não foi possível salvar o veículo. Confira os dados e tente novamente.', 'erro');
+    } finally {
+      setSalvando(false);
+    }
   }
 
   function limparFormulario() {
     setModelo('');
     setPlaca('');
+    setFoto('');
     setCor('');
+    setCapacidade(1);
+    setAcessivelPcd(false);
     setVeiculoEditando(null);
     setMostrarModal(false);
   }
@@ -44,17 +107,26 @@ export function Veiculos() {
     setVeiculoEditando(veiculo.id);
     setModelo(veiculo.modelo);
     setPlaca(veiculo.placa);
+    setFoto(veiculo.foto);
     setCor(veiculo.cor);
+    setCapacidade(veiculo.capacidade);
+    setAcessivelPcd(veiculo.acessivelPcd);
     setMostrarModal(true);
   }
 
-  function removerVeiculo(id: number) {
+  async function removerVeiculo(id: number) {
     if (!window.confirm('Deseja realmente remover este veículo?')) return;
 
-    const listaAtualizada = veiculos.filter((veiculo) => veiculo.id !== id);
-    salvarVeiculos(listaAtualizada);
-    setVeiculos(listaAtualizada);
-    if (veiculoEditando === id) limparFormulario();
+    try {
+      await removerVeiculoApi(id, usuario.token);
+      const listaAtualizada = veiculos.filter((veiculo) => veiculo.id !== id);
+      salvarVeiculos(listaAtualizada);
+      setVeiculos(listaAtualizada);
+      if (veiculoEditando === id) limparFormulario();
+      ToastAlerta('Veículo removido com sucesso!', 'sucesso');
+    } catch {
+      ToastAlerta('Não foi possível remover o veículo.', 'erro');
+    }
   }
 
   function abrirCadastro() {
@@ -83,7 +155,11 @@ export function Veiculos() {
             <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-black">{veiculos.length}</span>
           </div>
           <div className="space-y-3 p-6">
-            {veiculos.length === 0 ? (
+            {carregando ? (
+              <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Carregando veículos...</p>
+            ) : erro ? (
+              <p className="rounded-xl bg-red-50 p-5 text-center text-sm font-semibold text-red-700">{erro}</p>
+            ) : veiculos.length === 0 ? (
               <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Nenhum veículo cadastrado.</p>
             ) : veiculos.map((veiculo) => (
               <div key={veiculo.id} className="flex flex-col gap-4 rounded-xl border border-[#E2DDD3] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -92,7 +168,8 @@ export function Veiculos() {
                     <h3 className="font-black text-black">{veiculo.modelo}</h3>
                     {veiculo.ativo && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">ATIVO</span>}
                   </div>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{veiculo.cor} · {veiculo.placa}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{veiculo.cor} · {veiculo.placa} · {veiculo.capacidade} lugares</p>
+                  {veiculo.acessivelPcd && <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">Acessível para PCD</p>}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {!veiculo.ativo && <button type="button" onClick={() => alternarAtivo(veiculo.id)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800">Ativar</button>}
@@ -121,11 +198,14 @@ export function Veiculos() {
             </div>
             <div className="mt-6 space-y-4">
               <label className="block text-sm font-bold text-black">Modelo<input required value={modelo} onChange={(event) => setModelo(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="Ex: Nissan Kicks" /></label>
-              <label className="block text-sm font-bold text-black">Placa<input required value={placa} onChange={(event) => setPlaca(event.target.value.toUpperCase())} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal uppercase outline-none focus:border-black" placeholder="Ex: BRA2E19" /></label>
+              <label className="block text-sm font-bold text-black">Placa<input required maxLength={7} pattern="^[A-Z]{3}-?[0-9]{4}$|^[A-Z]{3}-?[0-9][A-Z][0-9]{2}$" value={placa} onChange={(event) => setPlaca(event.target.value.toUpperCase())} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal uppercase outline-none focus:border-black" placeholder="Ex: QXO2M22" /></label>
+              <label className="block text-sm font-bold text-black">Foto (URL)<input type="url" value={foto} onChange={(event) => setFoto(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="https://..." /></label>
               <label className="block text-sm font-bold text-black">Cor<input required value={cor} onChange={(event) => setCor(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="Ex: Azul" /></label>
+              <label className="block text-sm font-bold text-black">Capacidade<input required type="number" min={1} value={capacidade} onChange={(event) => setCapacidade(Number(event.target.value))} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+              <label className="flex items-center gap-3 text-sm font-bold text-black"><input type="checkbox" checked={acessivelPcd} onChange={(event) => setAcessivelPcd(event.target.checked)} className="h-4 w-4 accent-black" /> Acessível para PCD</label>
             </div>
             <div className="mt-6 flex gap-2">
-              <button type="submit" className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800">{veiculoEditando === null ? 'Salvar veículo' : 'Salvar alterações'}</button>
+              <button type="submit" disabled={salvando} className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60">{salvando ? 'Salvando...' : veiculoEditando === null ? 'Salvar veículo' : 'Salvar alterações'}</button>
               <button type="button" onClick={limparFormulario} className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-white">Cancelar</button>
             </div>
           </form>

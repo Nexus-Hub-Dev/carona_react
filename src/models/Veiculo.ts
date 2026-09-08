@@ -3,5 +3,8 @@ export interface Veiculo {
 	modelo: string;
 	placa: string;
 	cor: string;
+	foto: string;
+	capacidade: number;
+	acessivelPcd: boolean;
 	ativo: boolean;
 }

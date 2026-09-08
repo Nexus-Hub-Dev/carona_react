@@ -1,17 +1,19 @@
-import { useContext, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Car, Clock, GenderFemale, MapPin, Wheelchair } from '@phosphor-icons/react';
-import { ToastAlerta } from '../../utils/ToastAlerta';
-import { obterVeiculos } from '../../utils/veiculos';
+import { useContext, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../../contexts/AuthContext';
 import type { Veiculo } from '../../models/Veiculo';
 import { cadastrarViagem, calcularRota, type CalculoRota } from '../../services/Service';
-import { AuthContext } from '../../contexts/AuthContext';
+import { ToastAlerta } from '../../utils/ToastAlerta';
+import { obterVeiculos } from '../../utils/veiculos';
 
 // Interfaces de apoio para integração com Back-end/Front-end
 export function CriarCarona() {
   const navigate = useNavigate();
   const { usuario } = useContext(AuthContext);
   const [veiculos] = useState<Veiculo[]>(obterVeiculos);
+  const agora = new Date();
+  const dataMinima = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
 
   // Busca o veículo ativo atual
   const veiculoAtivo = useMemo(() => veiculos.find((v) => v.ativo), [veiculos]);
@@ -21,6 +23,7 @@ export function CriarCarona() {
   const [bairroOrigem, setBairroOrigem] = useState('');
   const [destino, setDestino] = useState('');
   const [bairroDestino, setBairroDestino] = useState('');
+  const [dataSaida, setDataSaida] = useState(dataMinima);
   const [horarioSaida, setHorarioSaida] = useState('');
   const [vagasDisponiveis, setVagasDisponiveis] = useState(3);
   const [calculoRota, setCalculoRota] = useState<CalculoRota | null>(null);
@@ -60,22 +63,40 @@ export function CriarCarona() {
       return;
     }
 
-    if (!origem || !destino || !horarioSaida || !precoDigitado || !calculoRota) {
+    if (!usuario.id) {
+      ToastAlerta('Sua sessão não possui um usuário válido. Faça login novamente.', 'erro');
+      return;
+    }
+
+    if (!origem || !destino || !dataSaida || !horarioSaida || !precoDigitado || !calculoRota) {
       ToastAlerta('Preencha todos os campos obrigatórios da rota!', 'erro');
       return;
     }
 
-    const dataViagem = new Date();
+    if (dataSaida < dataMinima) {
+      ToastAlerta('A data da viagem não pode ser anterior à data atual.', 'erro');
+      return;
+    }
+
+    const valorTotal = Number(precoDigitado);
+    if (!Number.isFinite(valorTotal) || valorTotal <= 0) {
+      ToastAlerta('Informe um valor válido para a viagem.', 'erro');
+      return;
+    }
+
     const [hora, minuto] = horarioSaida.split(':').map(Number);
-    dataViagem.setHours(hora, minuto, 0, 0);
+    const dataFormatada = `${dataSaida}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
 
     const novaCorrida = {
       partida: origem,
       destino,
-      data: dataViagem.toISOString(),
-      valorTotal: parseFloat(precoDigitado),
+      data: dataFormatada,
+      valorTotal,
       valorSugerido: calculoRota.valorSugerido,
       apenasMulheres,
+      disponivelPCD: acessivelPcd,
+      usuario: { id: usuario.id },
+      veiculo: { id: veiculoAtivo.id },
     };
 
     try {
@@ -92,6 +113,7 @@ export function CriarCarona() {
     setBairroOrigem('');
     setDestino('');
     setBairroDestino('');
+    setDataSaida(dataMinima);
     setHorarioSaida('');
     setPrecoDigitado('');
     setCalculoRota(null);
@@ -239,6 +261,20 @@ export function CriarCarona() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
+                    Data de Saída *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={dataMinima}
+                    value={dataSaida}
+                    onChange={(e) => setDataSaida(e.target.value)}
+                    className="w-full bg-transparent text-sm font-bold text-black focus:outline-none mt-1"
+                  />
+                </div>
+
+                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
+                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Horário de Saída *
                   </label>
                   <input
@@ -309,7 +345,7 @@ export function CriarCarona() {
                           : 'text-emerald-600'
                   }`}
                 />
-                <p className="mt-2 text-xs text-gray-600">Valor sugerido pela API. Até 30% acima fica em amarelo; acima disso fica em vermelho.</p>
+                <p className="mt-2 text-xs text-gray-600">Valor sugerido pela API. Você pode editar esse valor antes de publicar a viagem.</p>
                 {calculandoRota && <p className="mt-3 text-xs font-bold text-gray-600">Calculando rota...</p>}
                 {erroCalculoRota && <p className="mt-3 text-xs font-bold text-red-600">{erroCalculoRota}</p>}
                 {calculoRota && (
