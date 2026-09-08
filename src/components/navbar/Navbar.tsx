@@ -3,7 +3,7 @@ import { CaretDown, List, MagnifyingGlass, MapPin, Plus, UserCircle, X } from '@
 import { Link } from 'react-router-dom';
 
 const navItems = [
-  { label: 'Buscar\nCaronas', path: '/', icon: MapPin },
+  { label: 'Buscar\nCaronas', path: '/caronas', icon: MapPin },
   { label: 'Oferecer\nCarona', path: '/oferecer-carona', icon: Plus },
   { label: 'Minhas\nViagens', path: '/minhas-caronas', icon: List },
   { label: 'Meus\nVeículos', path: '/veiculos', icon: UserCircle },

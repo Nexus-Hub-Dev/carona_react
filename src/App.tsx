@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import Footer from "./components/footer/Footer"
 import Navbar from "./components/navbar/Navbar"
 import 'react-toastify/dist/ReactToastify.css'
@@ -6,6 +6,8 @@ import { ToastContainer } from "react-toastify"
 import { AuthProvider } from "./contexts/AuthContext"
 import Home from "./pages/home/Home"
 import Sobre from "./pages/sobre/Sobre"
+import { Caronas } from "./pages/caronas/Caronas"
+import { CriarCarona } from "./pages/caronas/CriarCaronas"
 
 function App() {
 	return (
@@ -17,6 +19,8 @@ function App() {
 						<Routes>
 							<Route path="/home" element={<Home />} />
 							<Route path="/sobre" element={<Sobre />} />
+							<Route path="/caronas" element={<Caronas />} />
+							<Route path="/oferecer-carona" element={<CriarCarona />} />
 						</Routes>
 					</div>
 					<Footer />
