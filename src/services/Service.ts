@@ -4,22 +4,33 @@ const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL
 })
 
+const authorizationHeader = (token: string) => ({
+    Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`
+})
+
 export interface CalculoRota {
     distanciaKm: number
-    tempoMinutos: number
-    horarioChegada: string
+    tempoEstimadoMin: number
+    valorSugerido: number
 }
 
-export const calcularRota = async (origem: string, destino: string, token: string): Promise<CalculoRota> => {
-    const resposta = await api.post('/viagens/sugestao-valor', { origem, destino }, {
-        headers: { Authorization: `Bearer ${token}` }
+export const calcularRota = async (partida: string, destino: string, token: string): Promise<CalculoRota> => {
+    const resposta = await api.post('/viagens/sugestao-valor', { partida, destino }, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const cadastrarViagem = async (dados: object, token: string) => {
+    const resposta = await api.post('/viagens', dados, {
+        headers: authorizationHeader(token)
     })
     return resposta.data
 }
 
 export const atualizarUsuario = async (id: number, dados: object, token: string) => {
     const resposta = await api.put(`/usuarios/${id}`, dados, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authorizationHeader(token)
     })
     return resposta.data
 }

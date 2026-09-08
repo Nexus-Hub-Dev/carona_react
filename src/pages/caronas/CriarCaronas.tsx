@@ -1,9 +1,10 @@
 import { useContext, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Car, Clock, GenderFemale, MapPin, Wheelchair } from '@phosphor-icons/react';
 import { ToastAlerta } from '../../utils/ToastAlerta';
 import { obterVeiculos } from '../../utils/veiculos';
 import type { Veiculo } from '../../models/Veiculo';
-import { calcularRota, type CalculoRota } from '../../services/Service';
+import { cadastrarViagem, calcularRota, type CalculoRota } from '../../services/Service';
 import { AuthContext } from '../../contexts/AuthContext';
 
 // Interfaces de apoio para integração com Back-end/Front-end
@@ -42,6 +43,7 @@ export function CriarCarona() {
     try {
       const resultado = await calcularRota(origem.trim(), destino.trim(), usuario.token);
       setCalculoRota(resultado);
+      setPrecoDigitado(resultado.valorSugerido.toFixed(2));
     } catch {
       setCalculoRota(null);
       setErroCalculoRota('Não foi possível calcular a rota. Confira os endereços e tente novamente.');
@@ -50,7 +52,7 @@ export function CriarCarona() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!veiculoAtivo) {
@@ -63,25 +65,27 @@ export function CriarCarona() {
       return;
     }
 
+    const dataViagem = new Date();
+    const [hora, minuto] = horarioSaida.split(':').map(Number);
+    dataViagem.setHours(hora, minuto, 0, 0);
+
     const novaCorrida = {
-      origem,
-      bairroOrigem,
+      partida: origem,
       destino,
-      bairroDestino,
-      horarioSaida,
-      horarioChegada: calculoRota.horarioChegada,
-      distanciaKm: calculoRota.distanciaKm,
-      tempoMinutos: calculoRota.tempoMinutos,
-      preco: parseFloat(precoDigitado),
-      vagasDisponiveis,
+      data: dataViagem.toISOString(),
+      valorTotal: parseFloat(precoDigitado),
+      valorSugerido: calculoRota.valorSugerido,
       apenasMulheres,
-      acessivelPcd,
-      veiculoId: veiculoAtivo.id,
     };
 
-    console.log('Dados prontos para envio ao backend:', novaCorrida);
-    ToastAlerta('Carona cadastrada e publicada com sucesso!', 'sucesso');
-    navigate('/caronas');
+    try {
+      await cadastrarViagem(novaCorrida, usuario.token);
+      ToastAlerta('Carona cadastrada e publicada com sucesso!', 'sucesso');
+      navigate('/caronas');
+    } catch {
+      ToastAlerta('Não foi possível publicar a carona. Verifique os dados e tente novamente.', 'erro');
+      return;
+    }
 
     // Limpar Formulário
     setOrigem('');
@@ -98,16 +102,12 @@ export function CriarCarona() {
       <div className="max-w-3xl mx-auto space-y-6">
         
         {/* CABEÇALHO */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E2DDD3] pb-4">
+        <div className="border-b border-[#E2DDD3] pb-5">
           <div>
-            <h1 className="text-2xl font-black text-black tracking-tight">Oferecer Nova Carona</h1>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Defina o trajeto, horários e acerte a ajuda de custo com os passageiros.
-            </p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Nova viagem</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight text-black">Oferecer nova carona</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-gray-600">Compartilhe seu trajeto, divida os custos da viagem e leve alguém com você.</p>
           </div>
-          <span className="bg-[#E2DDD3] text-gray-800 text-xs font-bold px-3 py-1.5 rounded-xl self-start sm:self-auto">
-            Visão do Motorista 🚗
-          </span>
         </div>
 
         {/* ALERTA: SEM VEÍCULO ATIVO */}
@@ -129,21 +129,31 @@ export function CriarCarona() {
           </div>
         ) : (
           /* CARD DE VEÍCULO ATIVO SELECIONADO */
-          <div className="bg-[#EFECE6] rounded-2xl p-4 border border-[#E2DDD3] flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-lg">
-                ✓
-              </div>
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
-                  Veículo Ativo Selecionado
+          <div className="overflow-hidden rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] shadow-[0_12px_30px_rgba(10,10,10,0.08)]">
+            <div className="flex items-center justify-between gap-3 border-b border-[#E2DDD3] bg-[#EFECE6] px-5 py-3">
+              <div className="flex items-center gap-2 text-black">
+                <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-black bg-white">
+                  <span className="text-sm font-black text-emerald-600">✓</span>
                 </span>
-                <p className="text-sm font-bold text-black">{veiculoAtivo.modelo}</p>
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.14em]">Veículo ativo</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-black">Pronto para publicar</span>
+            </div>
+            <div className="flex flex-col gap-4 bg-[#FAF8F5] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-black text-white">
+                  <Car size={25} weight="fill" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Carro selecionado</p>
+                  <p className="mt-1 text-lg font-black tracking-tight text-black">{veiculoAtivo.modelo}</p>
+                </div>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Placa</p>
+                <span className="mt-1 inline-block rounded-lg bg-white px-3 py-1.5 text-sm font-extrabold tracking-wider text-black shadow-sm">{veiculoAtivo.placa}</span>
               </div>
             </div>
-            <span className="text-xs font-extrabold text-gray-600 bg-[#FAF8F5] px-3 py-1 rounded-lg border border-[#E2DDD3]">
-              {veiculoAtivo.placa}
-            </span>
           </div>
         )}
 
@@ -157,7 +167,7 @@ export function CriarCarona() {
                 1. Rota e Localidades
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {/* Partida */}
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
@@ -275,30 +285,53 @@ export function CriarCarona() {
             {/* ETAPA 3: PRECIFICAÇÃO */}
             <div className="space-y-4">
               <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-[#E2DDD3] pb-2">
-                3. Valor por Assento
+                3. Valor da Viagem
               </h2>
               <div className="bg-[#FAF8F5] rounded-2xl p-4 border border-[#E2DDD3]">
                 <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase mb-1">
-                  Valor por assento (R$) *
+                  Valor da viagem (R$) *
                 </label>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
                   required
-                  placeholder="Ex: 25,00"
+                  placeholder="Calculado pela API"
                   value={precoDigitado}
                   onChange={(e) => setPrecoDigitado(e.target.value)}
-                  className="w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-2 text-sm font-bold text-black outline-none focus:border-black"
+                  className={`w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-2 text-sm font-bold outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100 ${
+                    !precoDigitado || !calculoRota
+                      ? 'text-gray-500'
+                      : Number(precoDigitado) > calculoRota.valorSugerido * 1.3
+                        ? 'text-red-600'
+                        : Number(precoDigitado) > calculoRota.valorSugerido
+                          ? 'text-amber-500'
+                          : 'text-emerald-600'
+                  }`}
                 />
-                <p className="mt-2 text-xs text-gray-600">A distância e a previsão de chegada serão calculadas pela API.</p>
+                <p className="mt-2 text-xs text-gray-600">Valor sugerido pela API. Até 30% acima fica em amarelo; acima disso fica em vermelho.</p>
                 {calculandoRota && <p className="mt-3 text-xs font-bold text-gray-600">Calculando rota...</p>}
                 {erroCalculoRota && <p className="mt-3 text-xs font-bold text-red-600">{erroCalculoRota}</p>}
                 {calculoRota && (
-                  <div className="mt-3 grid gap-2 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900 sm:grid-cols-3">
-                    <span><strong>Distância:</strong> {calculoRota.distanciaKm} km</span>
-                    <span><strong>Duração:</strong> {calculoRota.tempoMinutos} min</span>
-                    <span><strong>Chegada:</strong> {calculoRota.horarioChegada}</span>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center gap-3 rounded-xl border border-[#E2DDD3] bg-[#FAF8F5] p-3 text-gray-900">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-gray-700 shadow-sm">
+                        <MapPin size={21} weight="fill" aria-hidden="true" />
+                      </span>
+                      <span>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">Distância</span>
+                        <strong className="mt-0.5 block text-lg leading-none">{calculoRota.distanciaKm.toFixed(2)} km</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-xl border border-[#E2DDD3] bg-[#FAF8F5] p-3 text-gray-900">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-gray-700 shadow-sm">
+                        <Clock size={21} weight="fill" aria-hidden="true" />
+                      </span>
+                      <span>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">Duração estimada</span>
+                        <strong className="mt-0.5 block text-lg leading-none">{calculoRota.tempoEstimadoMin} min</strong>
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -310,29 +343,39 @@ export function CriarCarona() {
                 4. Preferências da Viagem
               </h2>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setApenasMulheres(!apenasMulheres)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
-                    apenasMulheres
-                      ? 'bg-[#831843] text-white shadow-sm'
-                      : 'bg-[#831843]/10 text-[#831843] hover:bg-[#831843]/20'
+                  aria-pressed={apenasMulheres}
+                  className={`flex items-center gap-3 rounded-xl border border-[#831843] bg-[#831843] p-3 text-left text-white transition-all hover:bg-[#70203b] ${
+                    apenasMulheres ? 'shadow-[0_0_0_3px_rgba(131,24,67,0.25)]' : 'opacity-90'
                   }`}
                 >
-                  <span>♀</span> Exclusivo Mulheres
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">
+                    <GenderFemale size={22} weight="bold" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider">Exclusivo mulheres</span>
+                    <span className="mt-1 block text-xs text-white/80">Apenas motoristas e passageiras mulheres</span>
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setAcessivelPcd(!acessivelPcd)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
-                    acessivelPcd
-                      ? 'bg-[#1e3a8a] text-white shadow-sm'
-                      : 'bg-[#1e3a8a]/10 text-[#1e3a8a] hover:bg-[#1e3a8a]/20'
+                  aria-pressed={acessivelPcd}
+                  className={`flex items-center gap-3 rounded-xl border border-[#1e3a8a] bg-[#1e3a8a] p-3 text-left text-white transition-all hover:bg-[#183273] ${
+                    acessivelPcd ? 'shadow-[0_0_0_3px_rgba(30,58,138,0.25)]' : 'opacity-90'
                   }`}
                 >
-                  <span>♿</span> Apta para PCD
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">
+                    <Wheelchair size={22} weight="bold" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider">Acessível para PCD</span>
+                    <span className="mt-1 block text-xs text-white/80">Veículo preparado para acessibilidade</span>
+                  </span>
                 </button>
               </div>
             </div>

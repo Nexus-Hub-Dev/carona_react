@@ -92,7 +92,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                ToastAlerta(`Erro ao autenticar o usuário (${error.response?.status})`, "erro")
+                if (error.response?.status === 401) {
+                    ToastAlerta('Usuário ou senha inválidos.', 'erro')
+                } else {
+                    ToastAlerta(`Erro ao autenticar o usuário (${error.response?.status})`, "erro")
+                }
                 return false
             }
             ToastAlerta('Não foi possível autenticar o usuário.', 'erro')
