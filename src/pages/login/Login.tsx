@@ -1,13 +1,12 @@
 import { useContext, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeSlash, LockKey, MapPin, User } from '@phosphor-icons/react'
 import type UsuarioLogin from '../../models/UsuarioLogin'
 import { AuthContext } from '../../contexts/AuthContext'
 
 function Login() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { handleLogin, isLoading } = useContext(AuthContext)
   const [form, setForm] = useState<Pick<UsuarioLogin, 'usuario' | 'senha'>>({ usuario: '', senha: '' })
   const [showPassword, setShowPassword] = useState(false)
@@ -27,8 +26,7 @@ function Login() {
 
     const authenticated = await handleLogin({ ...form, id: 0, nome: '', celular: '', foto: '', token: '' })
     if (authenticated) {
-      const destination = typeof location.state?.from?.pathname === 'string' ? location.state.from.pathname : '/home'
-      navigate(destination, { replace: true })
+      navigate('/home', { replace: true })
     }
   }
 

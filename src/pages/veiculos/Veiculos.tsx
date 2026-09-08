@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import type { Veiculo } from '../../models/Veiculo';
 import { salvarVeiculos, obterVeiculos } from '../../utils/veiculos';
-import { listarVeiculos } from '../../services/Service';
+import { atualizarVeiculo, cadastrarVeiculo as cadastrarVeiculoApi, listarVeiculos, removerVeiculo as removerVeiculoApi } from '../../services/Service';
 import { AuthContext } from '../../contexts/AuthContext';
+import { ToastAlerta } from '../../utils/ToastAlerta';
 
 export function Veiculos() {
   const navigate = useNavigate();
@@ -17,6 +18,10 @@ export function Veiculos() {
   const [modelo, setModelo] = useState('');
   const [placa, setPlaca] = useState('');
   const [cor, setCor] = useState('');
+  const [foto, setFoto] = useState('');
+  const [capacidade, setCapacidade] = useState(1);
+  const [acessivelPcd, setAcessivelPcd] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     let montado = true;
@@ -39,28 +44,56 @@ export function Veiculos() {
     };
   }, [usuario.token]);
 
-  function cadastrarVeiculo(event: FormEvent<HTMLFormElement>) {
+  async function cadastrarVeiculo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const listaAtualizada = veiculoEditando === null
-      ? [...veiculos, { id: Date.now(), modelo, placa, cor, ativo: veiculos.length === 0 }]
-      : veiculos.map((veiculo) => veiculo.id === veiculoEditando ? { ...veiculo, modelo, placa, cor } : veiculo);
+    setSalvando(true);
 
-    salvarVeiculos(listaAtualizada);
-    setVeiculos(listaAtualizada);
+    const dados = {
+      modelo: modelo.trim(),
+      placa: placa.trim().toUpperCase(),
+      cor: cor.trim(),
+      foto: foto.trim(),
+      capacidade,
+      acessivelPcd,
+    };
 
-    const destinoDepoisDoCadastro = (location.state as { from?: string } | null)?.from;
-    if (destinoDepoisDoCadastro) {
-      navigate(destinoDepoisDoCadastro, { replace: true });
-      return;
+    try {
+      const veiculoSalvo = veiculoEditando === null
+        ? await cadastrarVeiculoApi(dados, usuario.token)
+        : await atualizarVeiculo({
+          id: veiculoEditando,
+          ...dados,
+          ativo: veiculos.find((veiculo) => veiculo.id === veiculoEditando)?.ativo ?? false,
+        }, usuario.token);
+      const listaAtualizada = veiculoEditando === null
+        ? [...veiculos, veiculoSalvo]
+        : veiculos.map((veiculo) => veiculo.id === veiculoEditando ? { ...veiculo, ...veiculoSalvo } : veiculo);
+
+      salvarVeiculos(listaAtualizada);
+      setVeiculos(listaAtualizada);
+      ToastAlerta(veiculoEditando === null ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado com sucesso!', 'sucesso');
+
+      const destinoDepoisDoCadastro = (location.state as { from?: string } | null)?.from;
+      if (destinoDepoisDoCadastro) {
+        navigate(destinoDepoisDoCadastro, { replace: true });
+        return;
+      }
+      limparFormulario();
+    } catch (error: any) {
+      const mensagem = error?.response?.data?.message || error?.response?.data?.error;
+      ToastAlerta(mensagem || 'Não foi possível salvar o veículo. Verifique os dados e tente novamente.', 'erro');
+    } finally {
+      setSalvando(false);
     }
-
-    limparFormulario();
   }
 
   function limparFormulario() {
     setModelo('');
     setPlaca('');
     setCor('');
+    setFoto('');
+    setCapacidade(1);
+    setAcessivelPcd(false);
     setVeiculoEditando(null);
     setMostrarModal(false);
   }
@@ -70,16 +103,24 @@ export function Veiculos() {
     setModelo(veiculo.modelo);
     setPlaca(veiculo.placa);
     setCor(veiculo.cor);
+    setFoto(veiculo.foto ?? '');
+    setCapacidade(veiculo.capacidade ?? 1);
+    setAcessivelPcd(veiculo.acessivelPcd ?? false);
     setMostrarModal(true);
   }
 
   function removerVeiculo(id: number) {
     if (!window.confirm('Deseja realmente remover este veículo?')) return;
 
-    const listaAtualizada = veiculos.filter((veiculo) => veiculo.id !== id);
-    salvarVeiculos(listaAtualizada);
-    setVeiculos(listaAtualizada);
-    if (veiculoEditando === id) limparFormulario();
+    removerVeiculoApi(id, usuario.token)
+      .then(() => {
+        const listaAtualizada = veiculos.filter((veiculo) => veiculo.id !== id);
+        salvarVeiculos(listaAtualizada);
+        setVeiculos(listaAtualizada);
+        if (veiculoEditando === id) limparFormulario();
+        ToastAlerta('Veículo removido com sucesso!', 'sucesso');
+      })
+      .catch(() => ToastAlerta('Não foi possível remover o veículo.', 'erro'));
   }
 
   function abrirCadastro() {
@@ -88,12 +129,16 @@ export function Veiculos() {
   }
 
   function alternarAtivo(id: number) {
-    const listaAtualizada = veiculos.map((veiculo) => ({
-      ...veiculo,
-      ativo: veiculo.id === id,
-    }));
-    salvarVeiculos(listaAtualizada);
-    setVeiculos(listaAtualizada);
+    const listaAtualizada = veiculos.map((veiculo) => ({ ...veiculo, ativo: veiculo.id === id }));
+    const veiculo = veiculos.find((item) => item.id === id);
+    if (!veiculo) return;
+
+    atualizarVeiculo({ ...veiculo, ativo: true }, usuario.token)
+      .then(() => {
+        salvarVeiculos(listaAtualizada);
+        setVeiculos(listaAtualizada);
+      })
+      .catch(() => ToastAlerta('Não foi possível ativar o veículo.', 'erro'));
   }
 
   return (
@@ -114,12 +159,15 @@ export function Veiculos() {
               <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">Nenhum veículo cadastrado.</p>
             ) : veiculos.map((veiculo) => (
               <div key={veiculo.id} className="flex flex-col gap-4 rounded-xl border border-[#E2DDD3] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+                <div className="flex items-center gap-3">
+                  {veiculo.foto && <img src={veiculo.foto} alt={`Foto do ${veiculo.modelo}`} className="h-14 w-14 rounded-xl object-cover" />}
+                  <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-black text-black">{veiculo.modelo}</h3>
                     {veiculo.ativo && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">ATIVO</span>}
                   </div>
                   <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{veiculo.cor} · {veiculo.placa}</p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {!veiculo.ativo && <button type="button" onClick={() => alternarAtivo(veiculo.id)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800">Ativar</button>}
@@ -150,9 +198,12 @@ export function Veiculos() {
               <label className="block text-sm font-bold text-black">Modelo<input required value={modelo} onChange={(event) => setModelo(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="Ex: Nissan Kicks" /></label>
               <label className="block text-sm font-bold text-black">Placa<input required value={placa} onChange={(event) => setPlaca(event.target.value.toUpperCase())} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal uppercase outline-none focus:border-black" placeholder="Ex: BRA2E19" /></label>
               <label className="block text-sm font-bold text-black">Cor<input required value={cor} onChange={(event) => setCor(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="Ex: Azul" /></label>
+              <label className="block text-sm font-bold text-black">Foto <span className="font-normal text-gray-500">(opcional)</span><input value={foto} onChange={(event) => setFoto(event.target.value)} type="url" className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" placeholder="https://exemplo.com/carro.jpg" /></label>
+              <label className="block text-sm font-bold text-black">Capacidade<input required min="1" type="number" value={capacidade} onChange={(event) => setCapacidade(Number(event.target.value))} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
+              <label className="flex items-center gap-2 text-sm font-bold text-black"><input type="checkbox" checked={acessivelPcd} onChange={(event) => setAcessivelPcd(event.target.checked)} className="h-4 w-4" /> Veículo acessível para PCD</label>
             </div>
             <div className="mt-6 flex gap-2">
-              <button type="submit" className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800">{veiculoEditando === null ? 'Salvar veículo' : 'Salvar alterações'}</button>
+              <button type="submit" disabled={salvando} className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-wait disabled:opacity-60">{salvando ? 'Salvando...' : veiculoEditando === null ? 'Salvar veículo' : 'Salvar alterações'}</button>
               <button type="button" onClick={limparFormulario} className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-white">Cancelar</button>
             </div>
           </form>

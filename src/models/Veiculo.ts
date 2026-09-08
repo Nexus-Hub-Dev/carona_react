@@ -4,5 +4,7 @@ export interface Veiculo {
 	placa: string;
 	cor: string;
 	ativo: boolean;
-	acessivelPcd?: boolean;
+	foto: string;
+	capacidade: number;
+	acessivelPcd: boolean;
 }

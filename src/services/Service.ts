@@ -87,3 +87,26 @@ export const listarVeiculos = async (token: string): Promise<Veiculo[]> => {
     })
     return resposta.data
 }
+
+export type DadosVeiculo = Omit<Veiculo, 'id' | 'ativo'>;
+
+export const cadastrarVeiculo = async (dados: DadosVeiculo, token: string): Promise<Veiculo> => {
+    const resposta = await api.post('/veiculos', dados, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const atualizarVeiculo = async (dados: Veiculo, token: string): Promise<Veiculo> => {
+    const { ativo: _ativo, ...dadosApi } = dados;
+    const resposta = await api.put('/veiculos', dadosApi, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const removerVeiculo = async (id: number, token: string): Promise<void> => {
+    await api.delete(`/veiculos/${id}`, {
+        headers: authorizationHeader(token)
+    })
+}
