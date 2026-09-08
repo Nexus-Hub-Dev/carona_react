@@ -5,12 +5,23 @@ import { ToastAlerta } from '../../utils/ToastAlerta';
 import type { Veiculo } from '../../models/Veiculo';
 import { cadastrarViagem, calcularRota, listarVeiculos, type CalculoRota } from '../../services/Service';
 import { AuthContext } from '../../contexts/AuthContext';
+import { Car, Clock, GenderFemale, MapPin, Wheelchair } from '@phosphor-icons/react';
+import { useContext, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../../contexts/AuthContext';
+import type { Veiculo } from '../../models/Veiculo';
+import { cadastrarViagem, calcularRota, type CalculoRota } from '../../services/Service';
+import { ToastAlerta } from '../../utils/ToastAlerta';
+import { obterVeiculos } from '../../utils/veiculos';
 
 // Interfaces de apoio para integração com Back-end/Front-end
 export function CriarCarona() {
   const navigate = useNavigate();
   const { usuario } = useContext(AuthContext);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [veiculos] = useState<Veiculo[]>(obterVeiculos);
+  const agora = new Date();
+  const dataMinima = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     let montado = true;
@@ -49,6 +60,8 @@ export function CriarCarona() {
     const hoje = new Date();
     return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
   });
+  const [bairroDestino, setBairroDestino] = useState('');
+  const [dataSaida, setDataSaida] = useState(dataMinima);
   const [horarioSaida, setHorarioSaida] = useState('');
   const [vagasDisponiveis, setVagasDisponiveis] = useState(3);
   const [calculoRota, setCalculoRota] = useState<CalculoRota | null>(null);
@@ -120,6 +133,29 @@ export function CriarCarona() {
       ToastAlerta('O veículo selecionado não está cadastrado como acessível para PCD.', 'erro');
       return;
     }
+    if (!usuario.id) {
+      ToastAlerta('Sua sessão não possui um usuário válido. Faça login novamente.', 'erro');
+      return;
+    }
+
+    if (!origem || !destino || !dataSaida || !horarioSaida || !precoDigitado || !calculoRota) {
+      ToastAlerta('Preencha todos os campos obrigatórios da rota!', 'erro');
+      return;
+    }
+
+    if (dataSaida < dataMinima) {
+      ToastAlerta('A data da viagem não pode ser anterior à data atual.', 'erro');
+      return;
+    }
+
+    const valorTotal = Number(precoDigitado);
+    if (!Number.isFinite(valorTotal) || valorTotal <= 0) {
+      ToastAlerta('Informe um valor válido para a viagem.', 'erro');
+      return;
+    }
+
+    const [hora, minuto] = horarioSaida.split(':').map(Number);
+    const dataFormatada = `${dataSaida}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
 
     const novaCorrida = {
       partida: origem,
@@ -134,6 +170,13 @@ export function CriarCarona() {
       veiculo: {
         id: veiculoSelecionado.id,
       },
+      data: dataFormatada,
+      valorTotal,
+      valorSugerido: calculoRota.valorSugerido,
+      apenasMulheres,
+      disponivelPCD: acessivelPcd,
+      usuario: { id: usuario.id },
+      veiculo: { id: veiculoAtivo.id },
     };
 
     try {
@@ -164,6 +207,8 @@ export function CriarCarona() {
     setOrigem('');
     setDestino('');
     setDataSaida('');
+    setBairroDestino('');
+    setDataSaida(dataMinima);
     setHorarioSaida('');
     setPrecoDigitado('');
     setCalculoRota(null);
@@ -283,10 +328,12 @@ export function CriarCarona() {
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Data da Viagem *
+                    Data de Saída *
                   </label>
                   <input
                     type="date"
                     required
+                    min={dataMinima}
                     value={dataSaida}
                     onChange={(e) => setDataSaida(e.target.value)}
                     className="w-full bg-transparent text-sm font-bold text-black focus:outline-none mt-1"
@@ -366,6 +413,7 @@ export function CriarCarona() {
                   }`}
                 />
                 <p className="mt-2 text-xs text-gray-600">Informe o valor manualmente. Se os endereços forem preenchidos, uma sugestão será exibida automaticamente, mas não é obrigatória.</p>
+                <p className="mt-2 text-xs text-gray-600">Valor sugerido pela API. Você pode editar esse valor antes de publicar a viagem.</p>
                 {calculandoRota && <p className="mt-3 text-xs font-bold text-gray-600">Calculando rota...</p>}
                 {erroCalculoRota && <p className="mt-3 text-xs font-bold text-red-600">{erroCalculoRota}</p>}
                 {calculoRota && (

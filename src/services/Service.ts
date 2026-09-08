@@ -101,6 +101,8 @@ export const deletar = async (url: string, header: Object) => {
     await api.delete(url, header)
 }
 
+export type DadosVeiculo = Omit<Veiculo, 'id' | 'ativo'>;
+
 export const listarVeiculos = async (token: string): Promise<Veiculo[]> => {
     const resposta = await api.get('/veiculos', {
         headers: authorizationHeader(token)
@@ -110,11 +112,15 @@ export const listarVeiculos = async (token: string): Promise<Veiculo[]> => {
 
 export type DadosVeiculo = Omit<Veiculo, 'id' | 'ativo'>;
 
+    return resposta.data;
+}
+
 export const cadastrarVeiculo = async (dados: DadosVeiculo, token: string): Promise<Veiculo> => {
     const resposta = await api.post('/veiculos', dados, {
         headers: authorizationHeader(token)
     })
     return resposta.data
+    return resposta.data;
 }
 
 export const atualizarVeiculo = async (dados: Veiculo, token: string): Promise<Veiculo> => {
@@ -126,6 +132,10 @@ export const atualizarVeiculo = async (dados: Veiculo, token: string): Promise<V
 }
 
 export const removerVeiculo = async (id: number, token: string): Promise<void> => {
+    return resposta.data;
+}
+
+export const removerVeiculo = async (id: number, token: string) => {
     await api.delete(`/veiculos/${id}`, {
         headers: authorizationHeader(token)
     })
