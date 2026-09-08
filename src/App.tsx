@@ -1,33 +1,27 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import Footer from "./components/footer/Footer"
 import Navbar from "./components/navbar/Navbar"
-import Login from "./pages/login/Login"
-import Cadastro from "./pages/cadastro/Cadastro"
-
-function AppContent() {
-	const { pathname } = useLocation()
-	const isAuthenticationPage = pathname === "/login" || pathname === "/cadastro"
-
-	return (
-		<div className="flex min-h-screen flex-col">
-				{!isAuthenticationPage && <Navbar />}
-				<main className="flex flex-1 flex-col">
-					<Routes>
-						<Route path="/" element={<Navigate to="/login" replace />} />
-						<Route path="/login" element={<Login />} />
-						<Route path="/cadastro" element={<Cadastro />} />
-					</Routes>
-				</main>
-				{!isAuthenticationPage && <Footer />}
-		</div>
-	)
-}
+import 'react-toastify/dist/ReactToastify.css'
+import { ToastContainer } from "react-toastify"
+import { AuthProvider } from "./contexts/AuthContext"
+import { Caronas } from "./pages/caronas/Caronas"
+import { CriarCarona } from "./pages/caronas/CriarCaronas"
 
 function App() {
 	return (
-		<BrowserRouter>
-			<AppContent />
-		</BrowserRouter>
+		<AuthProvider>
+			<ToastContainer/>
+				<BrowserRouter>
+					<Navbar />
+					<div className="min-h-[80vh]">
+						<Routes>
+							<Route path="/caronas" element={<Caronas />} />
+							<Route path="/oferecer-carona" element={<CriarCarona />} />
+						</Routes>
+					</div>
+					<Footer />
+				</BrowserRouter>
+		</AuthProvider>
 	)
 }
 
