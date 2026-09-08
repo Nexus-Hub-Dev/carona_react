@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import Footer from "./components/footer/Footer"
 import Navbar from "./components/navbar/Navbar"
 import 'react-toastify/dist/ReactToastify.css'

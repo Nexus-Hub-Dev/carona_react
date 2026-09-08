@@ -6,7 +6,7 @@ celular: string
 usuario: string
 senha: string
 foto: string
-genero: string
+sexo: string
 
 
 
