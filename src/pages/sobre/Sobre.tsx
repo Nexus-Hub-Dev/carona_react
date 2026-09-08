@@ -1,4 +1,3 @@
-```tsx
 import {
   MapPin,
   ArrowRight,
@@ -196,4 +195,3 @@ function Sobre() {
 }
 
 export default Sobre;
-```
