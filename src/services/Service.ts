@@ -1,8 +1,40 @@
 import axios from "axios";
+import type { Veiculo } from "../models/Veiculo";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL
 })
+
+const authorizationHeader = (token: string) => ({
+    Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`
+})
+
+export interface CalculoRota {
+    distanciaKm: number
+    tempoEstimadoMin: number
+    valorSugerido: number
+}
+
+export const calcularRota = async (partida: string, destino: string, token: string): Promise<CalculoRota> => {
+    const resposta = await api.post('/viagens/sugestao-valor', { partida, destino }, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const cadastrarViagem = async (dados: object, token: string) => {
+    const resposta = await api.post('/viagens', dados, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
+
+export const atualizarUsuario = async (id: number, dados: object, token: string) => {
+    const resposta = await api.put(`/usuarios/${id}`, dados, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data
+}
 
 // Função  cadastrar Usuario
 
@@ -40,4 +72,34 @@ export const atualizar = async (url: string, dados: Object, setDados: Function, 
 
 export const deletar = async (url: string, header: Object) => {
     await api.delete(url, header)
+}
+
+export type DadosVeiculo = Omit<Veiculo, 'id' | 'ativo'>;
+
+export const listarVeiculos = async (token: string): Promise<Veiculo[]> => {
+    const resposta = await api.get('/veiculos', {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data;
+}
+
+export const cadastrarVeiculo = async (dados: DadosVeiculo, token: string): Promise<Veiculo> => {
+    const resposta = await api.post('/veiculos', dados, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data;
+}
+
+export const atualizarVeiculo = async (dados: Veiculo, token: string): Promise<Veiculo> => {
+    const { ativo: _ativo, ...dadosApi } = dados;
+    const resposta = await api.put('/veiculos', dadosApi, {
+        headers: authorizationHeader(token)
+    })
+    return resposta.data;
+}
+
+export const removerVeiculo = async (id: number, token: string) => {
+    await api.delete(`/veiculos/${id}`, {
+        headers: authorizationHeader(token)
+    })
 }

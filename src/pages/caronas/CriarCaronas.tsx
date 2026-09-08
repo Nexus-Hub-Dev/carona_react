@@ -1,21 +1,19 @@
-import { useMemo, useState } from 'react';
+import { Car, Clock, GenderFemale, MapPin, Wheelchair } from '@phosphor-icons/react';
+import { useContext, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../../contexts/AuthContext';
+import type { Veiculo } from '../../models/Veiculo';
+import { cadastrarViagem, calcularRota, type CalculoRota } from '../../services/Service';
 import { ToastAlerta } from '../../utils/ToastAlerta';
+import { obterVeiculos } from '../../utils/veiculos';
 
 // Interfaces de apoio para integração com Back-end/Front-end
-interface Veiculo {
-  id: number;
-  modelo: string;
-  placa: string;
-  cor: string;
-  ativo: boolean;
-}
-
 export function CriarCarona() {
-  // Simulação de verificação de veículo ativo do usuário logado
-  // Altere para carregar da sua API ou Contexto de Autenticação
-  const [veiculos] = useState<Veiculo[]>([
-    { id: 1, modelo: 'Nissan Kicks Azul', placa: 'BRA2E19', cor: 'Azul', ativo: true },
-  ]);
+  const navigate = useNavigate();
+  const { usuario } = useContext(AuthContext);
+  const [veiculos] = useState<Veiculo[]>(obterVeiculos);
+  const agora = new Date();
+  const dataMinima = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
 
   // Busca o veículo ativo atual
   const veiculoAtivo = useMemo(() => veiculos.find((v) => v.ativo), [veiculos]);
@@ -25,10 +23,12 @@ export function CriarCarona() {
   const [bairroOrigem, setBairroOrigem] = useState('');
   const [destino, setDestino] = useState('');
   const [bairroDestino, setBairroDestino] = useState('');
+  const [dataSaida, setDataSaida] = useState(dataMinima);
   const [horarioSaida, setHorarioSaida] = useState('');
-  const [horarioChegada, setHorarioChegada] = useState('');
   const [vagasDisponiveis, setVagasDisponiveis] = useState(3);
-  const [distanciaKm, setDistanciaKm] = useState<number | ''>('');
+  const [calculoRota, setCalculoRota] = useState<CalculoRota | null>(null);
+  const [calculandoRota, setCalculandoRota] = useState(false);
+  const [erroCalculoRota, setErroCalculoRota] = useState('');
   
   // Preferências/Filtros
   const [apenasMulheres, setApenasMulheres] = useState(false);
@@ -37,31 +37,25 @@ export function CriarCarona() {
   // Valor definido pelo motorista
   const [precoDigitado, setPrecoDigitado] = useState<string>('');
 
-  // Cálculo Dinâmico do Valor Sugerido
-  // Exemplo de regra: R$ 5,00 taxa base + R$ 2,50 por Km
-  const valorSugerido = useMemo(() => {
-    if (!distanciaKm || Number(distanciaKm) <= 0) return 0;
-    return 5.0 + Number(distanciaKm) * 2.5;
-  }, [distanciaKm]);
+  async function atualizarCalculoRota() {
+    if (!origem.trim() || !destino.trim()) return;
 
-  // Cálculo do Limite Máximo (+20%)
-  const valorMaximoPermitido = useMemo(() => {
-    return valorSugerido * 1.2;
-  }, [valorSugerido]);
+    setCalculandoRota(true);
+    setErroCalculoRota('');
 
-  // Validação se o preço digitado está acima do limite permitido (+20%)
-  const precoInvalido = useMemo(() => {
-    if (!precoDigitado || valorSugerido === 0) return false;
-    const numPreco = parseFloat(precoDigitado);
-    return numPreco > valorMaximoPermitido;
-  }, [precoDigitado, valorSugerido, valorMaximoPermitido]);
+    try {
+      const resultado = await calcularRota(origem.trim(), destino.trim(), usuario.token);
+      setCalculoRota(resultado);
+      setPrecoDigitado(resultado.valorSugerido.toFixed(2));
+    } catch {
+      setCalculoRota(null);
+      setErroCalculoRota('Não foi possível calcular a rota. Confira os endereços e tente novamente.');
+    } finally {
+      setCalculandoRota(false);
+    }
+  }
 
-  // Handler ao selecionar/usar o valor sugerido
-  const handleUsarValorSugerido = () => {
-    setPrecoDigitado(valorSugerido.toFixed(2));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!veiculoAtivo) {
@@ -69,45 +63,60 @@ export function CriarCarona() {
       return;
     }
 
-    if (!origem || !destino || !horarioSaida || !horarioChegada || !distanciaKm) {
+    if (!usuario.id) {
+      ToastAlerta('Sua sessão não possui um usuário válido. Faça login novamente.', 'erro');
+      return;
+    }
+
+    if (!origem || !destino || !dataSaida || !horarioSaida || !precoDigitado || !calculoRota) {
       ToastAlerta('Preencha todos os campos obrigatórios da rota!', 'erro');
       return;
     }
 
-    const valorFinal = precoDigitado ? parseFloat(precoDigitado) : valorSugerido;
-
-    if (valorFinal > valorMaximoPermitido) {
-      ToastAlerta('O valor por assento não pode exceder 20% do valor sugerido.', 'erro');
+    if (dataSaida < dataMinima) {
+      ToastAlerta('A data da viagem não pode ser anterior à data atual.', 'erro');
       return;
     }
 
+    const valorTotal = Number(precoDigitado);
+    if (!Number.isFinite(valorTotal) || valorTotal <= 0) {
+      ToastAlerta('Informe um valor válido para a viagem.', 'erro');
+      return;
+    }
+
+    const [hora, minuto] = horarioSaida.split(':').map(Number);
+    const dataFormatada = `${dataSaida}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
+
     const novaCorrida = {
-      origem,
-      bairroOrigem,
+      partida: origem,
       destino,
-      bairroDestino,
-      horarioSaida,
-      horarioChegada,
-      distanciaKm: Number(distanciaKm),
-      preco: valorFinal,
-      vagasDisponiveis,
+      data: dataFormatada,
+      valorTotal,
+      valorSugerido: calculoRota.valorSugerido,
       apenasMulheres,
-      acessivelPcd,
-      veiculoId: veiculoAtivo.id,
+      disponivelPCD: acessivelPcd,
+      usuario: { id: usuario.id },
+      veiculo: { id: veiculoAtivo.id },
     };
 
-    console.log('Dados prontos para envio ao backend:', novaCorrida);
-    ToastAlerta('Carona cadastrada e publicada com sucesso!', 'sucesso');
+    try {
+      await cadastrarViagem(novaCorrida, usuario.token);
+      ToastAlerta('Carona cadastrada e publicada com sucesso!', 'sucesso');
+      navigate('/caronas');
+    } catch {
+      ToastAlerta('Não foi possível publicar a carona. Verifique os dados e tente novamente.', 'erro');
+      return;
+    }
 
     // Limpar Formulário
     setOrigem('');
     setBairroOrigem('');
     setDestino('');
     setBairroDestino('');
+    setDataSaida(dataMinima);
     setHorarioSaida('');
-    setHorarioChegada('');
-    setDistanciaKm('');
     setPrecoDigitado('');
+    setCalculoRota(null);
   };
 
   return (
@@ -115,16 +124,12 @@ export function CriarCarona() {
       <div className="max-w-3xl mx-auto space-y-6">
         
         {/* CABEÇALHO */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E2DDD3] pb-4">
+        <div className="border-b border-[#E2DDD3] pb-5">
           <div>
-            <h1 className="text-2xl font-black text-black tracking-tight">Oferecer Nova Carona</h1>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Defina o trajeto, horários e acerte a ajuda de custo com os passageiros.
-            </p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Nova viagem</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight text-black">Oferecer nova carona</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-gray-600">Compartilhe seu trajeto, divida os custos da viagem e leve alguém com você.</p>
           </div>
-          <span className="bg-[#E2DDD3] text-gray-800 text-xs font-bold px-3 py-1.5 rounded-xl self-start sm:self-auto">
-            Visão do Motorista 🚗
-          </span>
         </div>
 
         {/* ALERTA: SEM VEÍCULO ATIVO */}
@@ -146,21 +151,31 @@ export function CriarCarona() {
           </div>
         ) : (
           /* CARD DE VEÍCULO ATIVO SELECIONADO */
-          <div className="bg-[#EFECE6] rounded-2xl p-4 border border-[#E2DDD3] flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-lg">
-                ✓
-              </div>
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
-                  Veículo Ativo Selecionado
+          <div className="overflow-hidden rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] shadow-[0_12px_30px_rgba(10,10,10,0.08)]">
+            <div className="flex items-center justify-between gap-3 border-b border-[#E2DDD3] bg-[#EFECE6] px-5 py-3">
+              <div className="flex items-center gap-2 text-black">
+                <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-black bg-white">
+                  <span className="text-sm font-black text-emerald-600">✓</span>
                 </span>
-                <p className="text-sm font-bold text-black">{veiculoAtivo.modelo}</p>
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.14em]">Veículo ativo</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-black">Pronto para publicar</span>
+            </div>
+            <div className="flex flex-col gap-4 bg-[#FAF8F5] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-black text-white">
+                  <Car size={25} weight="fill" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Carro selecionado</p>
+                  <p className="mt-1 text-lg font-black tracking-tight text-black">{veiculoAtivo.modelo}</p>
+                </div>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Placa</p>
+                <span className="mt-1 inline-block rounded-lg bg-white px-3 py-1.5 text-sm font-extrabold tracking-wider text-black shadow-sm">{veiculoAtivo.placa}</span>
               </div>
             </div>
-            <span className="text-xs font-extrabold text-gray-600 bg-[#FAF8F5] px-3 py-1 rounded-lg border border-[#E2DDD3]">
-              {veiculoAtivo.placa}
-            </span>
           </div>
         )}
 
@@ -174,7 +189,7 @@ export function CriarCarona() {
                 1. Rota e Localidades
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {/* Partida */}
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
@@ -186,6 +201,7 @@ export function CriarCarona() {
                     placeholder="Ex: Av. Paulista, 900"
                     value={origem}
                     onChange={(e) => setOrigem(e.target.value)}
+                    onBlur={atualizarCalculoRota}
                     className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
                   />
                 </div>
@@ -215,6 +231,7 @@ export function CriarCarona() {
                     placeholder="Ex: Faria Lima, 2777"
                     value={destino}
                     onChange={(e) => setDestino(e.target.value)}
+                    onBlur={atualizarCalculoRota}
                     className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
                   />
                 </div>
@@ -241,7 +258,21 @@ export function CriarCarona() {
                 2. Horários e Detalhes
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
+                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
+                    Data de Saída *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={dataMinima}
+                    value={dataSaida}
+                    onChange={(e) => setDataSaida(e.target.value)}
+                    className="w-full bg-transparent text-sm font-bold text-black focus:outline-none mt-1"
+                  />
+                </div>
+
                 <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
                   <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Horário de Saída *
@@ -255,34 +286,6 @@ export function CriarCarona() {
                   />
                 </div>
 
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
-                    Previsão de Chegada *
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={horarioChegada}
-                    onChange={(e) => setHorarioChegada(e.target.value)}
-                    className="w-full bg-transparent text-sm font-bold text-black focus:outline-none mt-1"
-                  />
-                </div>
-
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
-                    Distância Estimada (Km) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    required
-                    placeholder="Ex: 12.5"
-                    value={distanciaKm}
-                    onChange={(e) => setDistanciaKm(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400 mt-1"
-                  />
-                </div>
               </div>
 
               {/* Vagas Disponíveis */}
@@ -301,7 +304,7 @@ export function CriarCarona() {
                   >
                     -
                   </button>
-                  <span className="font-black text-base text-black min-w-[20px] text-center">
+                  <span className="font-black text-base text-black min-w-5 text-center">
                     {vagasDisponiveis}
                   </span>
                   <button
@@ -315,79 +318,59 @@ export function CriarCarona() {
               </div>
             </div>
 
-            {/* ETAPA 3: PRECIFICAÇÃO E SUGESTÃO (+20%) */}
+            {/* ETAPA 3: PRECIFICAÇÃO */}
             <div className="space-y-4">
               <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-[#E2DDD3] pb-2">
-                3. Valor por Assento
+                3. Valor da Viagem
               </h2>
-
-              {valorSugerido > 0 ? (
-                <div className="bg-[#FAF8F5] rounded-2xl p-4 border border-[#E2DDD3] space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E2DDD3] pb-3">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
-                        Cálculo Automático CORA
+              <div className="bg-[#FAF8F5] rounded-2xl p-4 border border-[#E2DDD3]">
+                <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase mb-1">
+                  Valor da viagem (R$) *
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  placeholder="Calculado pela API"
+                  value={precoDigitado}
+                  onChange={(e) => setPrecoDigitado(e.target.value)}
+                  className={`w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-2 text-sm font-bold outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100 ${
+                    !precoDigitado || !calculoRota
+                      ? 'text-gray-500'
+                      : Number(precoDigitado) > calculoRota.valorSugerido * 1.3
+                        ? 'text-red-600'
+                        : Number(precoDigitado) > calculoRota.valorSugerido
+                          ? 'text-amber-500'
+                          : 'text-emerald-600'
+                  }`}
+                />
+                <p className="mt-2 text-xs text-gray-600">Valor sugerido pela API. Você pode editar esse valor antes de publicar a viagem.</p>
+                {calculandoRota && <p className="mt-3 text-xs font-bold text-gray-600">Calculando rota...</p>}
+                {erroCalculoRota && <p className="mt-3 text-xs font-bold text-red-600">{erroCalculoRota}</p>}
+                {calculoRota && (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center gap-3 rounded-xl border border-[#E2DDD3] bg-[#FAF8F5] p-3 text-gray-900">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-gray-700 shadow-sm">
+                        <MapPin size={21} weight="fill" aria-hidden="true" />
                       </span>
-                      <p className="text-xs text-gray-600 font-medium">
-                        Baseado no trajeto de {distanciaKm} Km
-                      </p>
+                      <span>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">Distância</span>
+                        <strong className="mt-0.5 block text-lg leading-none">{calculoRota.distanciaKm.toFixed(2)} km</strong>
+                      </span>
                     </div>
-
-                    {/* VALOR SUGERIDO EM VERDE */}
-                    <div className="text-left sm:text-right flex items-center gap-2 sm:block">
-                      <span className="text-xs text-emerald-800 font-extrabold block">Valor Sugerido:</span>
-                      <span className="text-xl font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-300">
-                        R$ {valorSugerido.toFixed(2).replace('.', ',')}
+                    <div className="flex items-center gap-3 rounded-xl border border-[#E2DDD3] bg-[#FAF8F5] p-3 text-gray-900">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-gray-700 shadow-sm">
+                        <Clock size={21} weight="fill" aria-hidden="true" />
+                      </span>
+                      <span>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">Duração estimada</span>
+                        <strong className="mt-0.5 block text-lg leading-none">{calculoRota.tempoEstimadoMin} min</strong>
                       </span>
                     </div>
                   </div>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase mb-1">
-                        Seu Preço Desejado (R$)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder={`Até R$ ${valorMaximoPermitido.toFixed(2)}`}
-                        value={precoDigitado}
-                        onChange={(e) => setPrecoDigitado(e.target.value)}
-                        className={`w-full bg-white rounded-xl px-3 py-2 border text-sm font-bold focus:outline-none transition-all ${
-                          precoInvalido
-                            ? 'border-red-500 text-red-600 focus:ring-1 focus:ring-red-500'
-                            : 'border-[#E2DDD3] text-black focus:border-black'
-                        }`}
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleUsarValorSugerido}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm shrink-0 self-end"
-                    >
-                      Usar Valor Sugerido
-                    </button>
-                  </div>
-
-                  {/* MENSSAGEM DE REGRAS E MÁXIMO (+20%) */}
-                  <div className="text-[11px] font-semibold space-y-1 pt-1">
-                    <p className="text-gray-600">
-                      ℹ️ Você pode ajustar o preço em até **+20%** sobre o valor sugerido (Limite máximo:{' '}
-                      <strong className="text-black">R$ {valorMaximoPermitido.toFixed(2).replace('.', ',')}</strong>).
-                    </p>
-                    {precoInvalido && (
-                      <p className="text-red-600 font-bold">
-                        ❌ O valor inserido é superior ao limite permitido (+20%). Reduza para publicar.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-[#FAF8F5] rounded-xl p-4 border border-[#E2DDD3] text-center text-xs text-gray-500 font-medium">
-                  Insira a <strong className="text-black">Distância Estimada (Km)</strong> na etapa anterior para calcular o valor sugerido da corrida.
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* ETAPA 4: PREFERÊNCIAS E TAGS */}
@@ -396,29 +379,39 @@ export function CriarCarona() {
                 4. Preferências da Viagem
               </h2>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setApenasMulheres(!apenasMulheres)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
-                    apenasMulheres
-                      ? 'bg-[#831843] text-white shadow-sm'
-                      : 'bg-[#831843]/10 text-[#831843] hover:bg-[#831843]/20'
+                  aria-pressed={apenasMulheres}
+                  className={`flex items-center gap-3 rounded-xl border border-[#831843] bg-[#831843] p-3 text-left text-white transition-all hover:bg-[#70203b] ${
+                    apenasMulheres ? 'shadow-[0_0_0_3px_rgba(131,24,67,0.25)]' : 'opacity-90'
                   }`}
                 >
-                  <span>♀</span> Exclusivo Mulheres
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">
+                    <GenderFemale size={22} weight="bold" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider">Exclusivo mulheres</span>
+                    <span className="mt-1 block text-xs text-white/80">Apenas motoristas e passageiras mulheres</span>
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setAcessivelPcd(!acessivelPcd)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
-                    acessivelPcd
-                      ? 'bg-[#1e3a8a] text-white shadow-sm'
-                      : 'bg-[#1e3a8a]/10 text-[#1e3a8a] hover:bg-[#1e3a8a]/20'
+                  aria-pressed={acessivelPcd}
+                  className={`flex items-center gap-3 rounded-xl border border-[#1e3a8a] bg-[#1e3a8a] p-3 text-left text-white transition-all hover:bg-[#183273] ${
+                    acessivelPcd ? 'shadow-[0_0_0_3px_rgba(30,58,138,0.25)]' : 'opacity-90'
                   }`}
                 >
-                  <span>♿</span> Apta para PCD
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">
+                    <Wheelchair size={22} weight="bold" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider">Acessível para PCD</span>
+                    <span className="mt-1 block text-xs text-white/80">Veículo preparado para acessibilidade</span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -427,12 +420,7 @@ export function CriarCarona() {
             <div className="pt-4 border-t border-[#E2DDD3]">
               <button
                 type="submit"
-                disabled={precoInvalido}
-                className={`w-full py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-sm ${
-                  precoInvalido
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-black hover:bg-gray-800 text-white active:scale-[0.99]'
-                }`}
+                className="w-full rounded-xl bg-black py-3.5 text-sm font-extrabold text-white shadow-sm transition-all hover:bg-gray-800 active:scale-[0.99]"
               >
                 Publicar Carona →
               </button>

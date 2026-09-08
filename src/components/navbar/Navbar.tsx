@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { CaretDown, List, MagnifyingGlass, MapPin, Plus, UserCircle, X } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const navItems = [
   { label: 'Buscar\nCaronas', path: '/caronas', icon: MapPin },
@@ -11,6 +12,9 @@ const navItems = [
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { usuario, handleLogout } = useContext(AuthContext);
+  const nomeExibido = usuario.nome.length > 7 ? `${usuario.nome.slice(0, 7)}...` : usuario.nome;
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black px-4 text-white sm:px-6">
@@ -40,11 +44,23 @@ export const Navbar: React.FC = () => {
             <Plus size={18} weight="bold" aria-hidden="true" />
             Oferecer<br />Carona
           </Link>
-          <button type="button" className="flex h-11 items-center gap-2 rounded-full border border-[#3b3b3b] px-2.5 text-xs font-semibold text-white" aria-label="Abrir perfil">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-[#7e9b91] text-black"><UserCircle size={23} weight="fill" aria-hidden="true" /></span>
-            <span>Paula</span>
-            <CaretDown size={13} aria-hidden="true" />
-          </button>
+          <div className="relative">
+            <button type="button" onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex h-11 items-center gap-2 rounded-full border border-[#3b3b3b] px-2.5 text-xs font-semibold text-white" aria-label="Abrir perfil" aria-expanded={isProfileOpen}>
+              <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full bg-[#7e9b91] text-black">
+                {usuario.foto ? <img src={usuario.foto} alt="" className="h-full w-full object-cover" /> : <UserCircle size={23} weight="fill" aria-hidden="true" />}
+              </span>
+              <span title={usuario.nome || 'Meu perfil'}>{nomeExibido || 'Meu perfil'}</span>
+              <CaretDown size={13} aria-hidden="true" />
+            </button>
+            {isProfileOpen && (
+              <div className="absolute right-0 top-13 z-50 w-56 rounded-2xl border border-[#333] bg-[#171717] p-2 shadow-2xl">
+                <Link to="/perfil" onClick={() => setIsProfileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Editar perfil</Link>
+                <Link to="/historico-caronas" onClick={() => setIsProfileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Histórico de caronas</Link>
+                <Link to="/dados-bancarios" onClick={() => setIsProfileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Dados bancários</Link>
+                <button type="button" onClick={handleLogout} className="mt-1 w-full rounded-xl border-t border-[#333] px-3 py-2.5 text-left text-sm font-semibold text-red-300 hover:bg-[#292929]">Sair</button>
+              </div>
+            )}
+          </div>
         </div>
 
         <button
@@ -68,6 +84,12 @@ export const Navbar: React.FC = () => {
             ))}
             <li className="pt-2">
               <Link to="/oferecer-carona" onClick={() => setIsOpen(false)} className="flex items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-bold text-black no-underline hover:bg-[#e9e9e9]"><Plus size={19} weight="bold" aria-hidden="true" />Oferecer carona</Link>
+            </li>
+            <li className="mt-2 border-t border-white/10 pt-2">
+              <Link to="/perfil" onClick={() => setIsOpen(false)} className="block rounded-lg px-4 py-3 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Editar perfil</Link>
+              <Link to="/historico-caronas" onClick={() => setIsOpen(false)} className="block rounded-lg px-4 py-3 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Histórico de caronas</Link>
+              <Link to="/dados-bancarios" onClick={() => setIsOpen(false)} className="block rounded-lg px-4 py-3 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Dados bancários</Link>
+              <button type="button" onClick={handleLogout} className="w-full rounded-lg px-4 py-3 text-left text-sm font-semibold text-red-300 hover:bg-[#292929]">Sair</button>
             </li>
           </ul>
         </div>

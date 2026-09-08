@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ToastAlerta } from '../../utils/ToastAlerta';
+import { obterVeiculos } from '../../utils/veiculos';
 
 // Interface compatível com o Schema da API e com suporte aos dados visuais do front
 interface ViagemVisual {
@@ -112,7 +114,9 @@ const INITIAL_VIAGENS: ViagemVisual[] = [
 ];
 
 export function Caronas() {
+  const navigate = useNavigate();
   const [viagens, setViagens] = useState<ViagemVisual[]>(INITIAL_VIAGENS);
+  const [mostrarAlertaVeiculo, setMostrarAlertaVeiculo] = useState(false);
   const [pontoPartida, setPontoPartida] = useState('');
   const [destinoFinal, setDestinoFinal] = useState('');
   const [periodo, setPeriodo] = useState<'Manhã' | 'Tarde' | 'Noite' | 'Todos'>('Todos');
@@ -134,6 +138,15 @@ export function Caronas() {
     ToastAlerta(`Reserva realizada para a carona #${id}!`, 'sucesso');
   };
 
+  const handleCriarCarona = () => {
+    if (obterVeiculos().length === 0) {
+      setMostrarAlertaVeiculo(true);
+      return;
+    }
+
+    navigate('/oferecer-carona');
+  };
+
   const viagensFiltradas = viagens.filter((viagem) => {
     const atendePartida =
       viagem.origem.toLowerCase().includes(pontoPartida.toLowerCase()) ||
@@ -151,6 +164,29 @@ export function Caronas() {
 
   return (
     <div className="min-h-screen bg-[#F6F3EB] text-[#000000] font-sans pb-16">
+      {mostrarAlertaVeiculo && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-labelledby="veiculo-alerta-titulo">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-amber-100 text-2xl">🚗</div>
+            <h2 id="veiculo-alerta-titulo" className="mt-4 text-xl font-black text-black">Adicione um veículo para continuar</h2>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">Para oferecer uma carona, você precisa cadastrar pelo menos um carro.</p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
+              <Link to="/veiculos" state={{ from: '/oferecer-carona' }} onClick={() => setMostrarAlertaVeiculo(false)} className="rounded-xl bg-black px-5 py-3 text-sm font-bold text-white no-underline transition hover:bg-gray-800">Adicionar veículo</Link>
+              <button type="button" onClick={() => setMostrarAlertaVeiculo(false)} className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-100">Agora não</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-8 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Você dirige?</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-black">Compartilhe seu trajeto e ajude a pagar os custos.</h1>
+          <p className="mt-1 max-w-2xl text-sm text-gray-600">Tem um carro e vai fazer um caminho? Crie uma carona, divida as despesas e viaje com companhia.</p>
+        </div>
+        <button type="button" onClick={handleCriarCarona} className="shrink-0 rounded-xl bg-black px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-gray-800">Criar uma carona →</button>
+      </section>
+
       {/* BARRA DE FILTROS */}
       <section className="max-w-6xl mx-auto pt-4 sm:pt-8 px-4">
         <div className="bg-[#EFECE6] rounded-2xl p-3 sm:p-4 shadow-sm border border-[#E2DDD3] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">

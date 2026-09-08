@@ -1,4 +1,5 @@
 import { MagnifyingGlass, CalendarBlank, Users, MapPin, Handshake, Leaf, Wheelchair, GenderFemale } from '@phosphor-icons/react';
+import { Link } from 'react-router-dom';
 
 function Home() {
   return (
@@ -155,9 +156,9 @@ function Home() {
               <p className="mt-4 text-gray-400">Cadastre sua rota habitual ou próxima viagem intermunicipal em minutos e compense seus gastos de estrada com praticidade.</p>
             </div>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              <button className="rounded-lg bg-white px-6 py-3 font-bold text-black transition hover:bg-gray-200">
+              <Link to="/caronas" className="rounded-lg bg-white px-6 py-3 text-center font-bold text-black no-underline transition hover:bg-gray-200">
                 Publicar Carona
-              </button>
+              </Link>
               <button className="rounded-lg border border-gray-700 bg-transparent px-6 py-3 font-bold text-white transition hover:bg-gray-800">
                 Como funciona
               </button>

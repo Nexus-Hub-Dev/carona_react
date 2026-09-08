@@ -1,7 +1,7 @@
 import axios from "axios";
 import { createContext, useEffect, useState, type ReactNode } from "react";
 import type UsuarioLogin from "../models/UsuarioLogin";
-import { login } from "../services/Service";
+import { atualizarUsuario, login } from "../services/Service";
 import { ToastAlerta } from "../utils/ToastAlerta";
 
 const STORAGE_KEY = 'blogPessoalUsuario';
@@ -26,6 +26,7 @@ const sanitizeUsuario = (usuario: Partial<UsuarioLogin>): UsuarioLogin => ({
 interface AuthContextProps {
     usuario: UsuarioLogin
     handleLogin(usuario: UsuarioLogin): Promise<boolean>
+    handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto'>): Promise<boolean>
     handleLogout(): void
     isLoading: boolean
     isLogout: boolean
@@ -91,7 +92,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                ToastAlerta(`Erro ao autenticar o usuário (${error.response?.status})`, "erro")
+                if (error.response?.status === 401) {
+                    ToastAlerta('Usuário ou senha inválidos.', 'erro')
+                } else {
+                    ToastAlerta(`Erro ao autenticar o usuário (${error.response?.status})`, "erro")
+                }
                 return false
             }
             ToastAlerta('Não foi possível autenticar o usuário.', 'erro')
@@ -112,8 +117,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         ToastAlerta('Usuario desconectado com sucesso!', 'sucesso');
 
     }
+
+    async function handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto'>): Promise<boolean> {
+        try {
+            const usuarioAtualizado = await atualizarUsuario(usuario.id, dados, usuario.token)
+            setUsuario(sanitizeUsuario({ ...usuario, ...usuarioAtualizado, ...dados, token: usuario.token }))
+            ToastAlerta('Perfil atualizado com sucesso!', 'sucesso')
+            return true
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                ToastAlerta(`Não foi possível atualizar o perfil (${error.response?.status})`, 'erro')
+            } else {
+                ToastAlerta('Não foi possível atualizar o perfil.', 'erro')
+            }
+            return false
+        }
+    }
     return (
-        <AuthContext.Provider value={{ usuario, handleLogin, handleLogout, isLoading, isLogout }}>
+        <AuthContext.Provider value={{ usuario, handleLogin, handleUpdateProfile, handleLogout, isLoading, isLogout }}>
             {children}
         </AuthContext.Provider>
     )

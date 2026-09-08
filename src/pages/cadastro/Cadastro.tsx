@@ -32,9 +32,9 @@ function Cadastro() {
         senha: form.senha,
         celular: form.celular,
         foto: form.foto,
-        sexo: form.sexo,
+        genero: form.sexo,
       }
-      await cadastrarUsuario('/usuarios', dados, () => undefined)
+      await cadastrarUsuario('/usuarios/cadastrar', dados, () => undefined)
       ToastAlerta('Cadastro realizado com sucesso!', 'sucesso')
       navigate('/login')
     } catch (requestError) {
