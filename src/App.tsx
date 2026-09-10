@@ -11,6 +11,7 @@ import "react-toastify/dist/ReactToastify.css"
 
 import Footer from "./components/footer/Footer"
 import Navbar from "./components/navbar/Navbar"
+import { VLibras } from "./components/vlibras/VLibras" // 1. Importação do seu componente VLibras
 import { AuthContext, AuthProvider } from "./contexts/AuthContext"
 
 import Cadastro from "./pages/cadastro/Cadastro"
@@ -162,6 +163,9 @@ function AppContent() {
       {!isAuthenticationPage && <Footer />}
 
       <ToastContainer />
+      
+      {/* 2. Adicionado aqui ao final do layout */}
+      <VLibras />
     </div>
   )
 }
