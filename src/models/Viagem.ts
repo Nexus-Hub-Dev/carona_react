@@ -16,4 +16,10 @@ export interface Viagem {
 	statusTransito?: string
 	preco: number
 	vagasDisponiveis: number
+
+	// Adicionada 4 linhas:
+	latitudePartida?: number
+	longitudePartida?: number
+	latitudeDestino?: number
+	longitudeDestino?: number
 }
