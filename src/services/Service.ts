@@ -287,3 +287,15 @@ export const removerVeiculo = async (
         }
     );
 };
+
+//feat_Mapa: Função gerarMapa
+export const gerarMapa = async (startCoordinates: [number, number], endCoordinates: [number, number]) => {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${startCoordinates[0]},${startCoordinates[1]};${endCoordinates[0]},${endCoordinates[1]}?overview=full&geometries=geojson`
+    const response = await axios.get(url)
+    return response.data.routes[0].geometry.coordinates
+  } catch (error) {
+    console.error('Erro ao obter a rota', error)
+    throw error
+  }
+}
