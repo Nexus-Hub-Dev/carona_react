@@ -83,6 +83,12 @@ export function CriarCarona() {
   // DATA MÍNIMA
   // ============================================================
 
+  // O servidor pode estar rodando em um fuso horário diferente do
+  // de Brasília, então horários "de hoje" muito próximos do agora
+  // podem ser rejeitados pelo back. A margem de segurança de 3h
+  // (ver MARGEM_SEGURANCA_MS mais abaixo) cobre essa diferença, então
+  // aqui o mínimo pode voltar a ser hoje — quem garante o horário
+  // seguro é a validação de data/hora no submit.
   const agora = new Date();
 
   const dataMinima = `${agora.getFullYear()}-${String(
@@ -236,7 +242,7 @@ export function CriarCarona() {
 
     if (dataSaida < dataMinima) {
       ToastAlerta(
-        'A data da viagem não pode ser anterior à data atual.',
+        'A data da viagem não pode ser anterior à data de hoje.',
         'erro'
       );
 
@@ -271,12 +277,21 @@ export function CriarCarona() {
       `${dataSaida}T${horarioSaida}:00`
     );
 
+    // Margem de segurança: o back pode estar rodando num fuso
+    // horário diferente do de Brasília, então um horário "quase
+    // agora" pode já parecer passado pra ele. 3h de folga cobre
+    // essa diferença com sobra.
+    const MARGEM_SEGURANCA_MS = 3 * 60 * 60 * 1000; // 3 horas
+    const agoraComMargem = new Date(
+      Date.now() + MARGEM_SEGURANCA_MS
+    );
+
     if (
       Number.isNaN(dataHoraViagem.getTime()) ||
-      dataHoraViagem < new Date()
+      dataHoraViagem < agoraComMargem
     ) {
       ToastAlerta(
-        'A data e o horário da viagem devem ser atuais ou futuros.',
+        'Escolha um horário de saída com pelo menos 3h de antecedência a partir de agora.',
         'erro'
       );
 
@@ -420,9 +435,20 @@ export function CriarCarona() {
         }
       );
 
+      // O back retorna 400 "genérico" (só timestamp/status/error/path,
+      // sem detalhar o campo) em alguns casos, como quando a validação
+      // @Future da data falha. Como não dá pra distinguir o motivo
+      // exato a partir da resposta, orientamos o usuário a checar a
+      // data/horário primeiro, já que é a causa mais comum.
+      const status = error?.response?.status;
+      const semDetalheDoErro =
+        status === 400 && !mensagem;
+
       ToastAlerta(
         mensagem ||
-          'Não foi possível publicar a carona. Verifique os dados e tente novamente.',
+          (semDetalheDoErro
+            ? 'Não foi possível publicar a carona. Verifique se o horário de saída tem pelo menos 3h de antecedência e tente novamente.'
+            : 'Não foi possível publicar a carona. Verifique os dados e tente novamente.'),
         'erro'
       );
     }
