@@ -13,6 +13,7 @@ import {
 import { AuthContext } from '../../contexts/AuthContext';
 import { ToastAlerta } from '../../utils/ToastAlerta';
 import { obterVeiculos, salvarVeiculos } from '../../utils/veiculos';
+import CarLoading from '../../components/loading/CarLoading';
 
 function aplicarSelecaoLocal(
   veiculos: Omit<Veiculo, 'ativo'>[],
@@ -445,9 +446,7 @@ export function Veiculos() {
           {/* Lista */}
           <div className="space-y-3 p-6">
             {carregando ? (
-              <p className="rounded-xl bg-white p-5 text-center text-sm font-semibold text-gray-500">
-                Carregando veículos...
-              </p>
+              <CarLoading label="Carregando veículos..." />
             ) : erro ? (
               <p className="rounded-xl bg-red-50 p-5 text-center text-sm font-semibold text-red-700">
                 {erro}

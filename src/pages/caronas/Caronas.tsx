@@ -5,6 +5,7 @@ import { obterVeiculos } from '../../utils/veiculos';
 import { atualizarViagem, listarViagens, removerViagem } from '../../services/Service';
 import { AuthContext } from '../../contexts/AuthContext';
 import Mapa from '../../components/mapa/Mapa'; // Importação do novo componente de Mapa
+import CarLoading from '../../components/loading/CarLoading';
 
 // Interface compatível com o schema da API e com suporte aos dados visuais do front
 interface ViagemVisual {
@@ -394,7 +395,7 @@ export function Caronas() {
 
         <div className="flex flex-col gap-4 sm:gap-6">
           {carregandoViagens ? (
-            <div className="text-center py-12 bg-[#EFECE6] rounded-2xl border border-[#E2DDD3] text-gray-600 font-semibold px-4 text-sm">Carregando caronas cadastradas...</div>
+            <CarLoading label="Carregando caronas cadastradas..." />
           ) : viagensFiltradas.length === 0 ? (
             <div className="text-center py-12 bg-[#EFECE6] rounded-2xl border border-[#E2DDD3] text-gray-600 font-semibold px-4 text-sm">Nenhuma carona encontrada com os filtros selecionados.</div>
           ) : (
