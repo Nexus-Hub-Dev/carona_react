@@ -46,18 +46,66 @@ function Cadastro() {
   return (
     <section className="flex flex-1 items-center justify-center bg-[#f5efe4] px-5 py-10">
       <div className="w-full max-w-130 rounded-3xl bg-white p-7 shadow-[0_24px_70px_rgba(24,59,53,0.14)] sm:p-10">
-        <Link to="/login" className="inline-flex items-center gap-2 text-sm font-bold text-[#65736e] no-underline hover:text-[#0a0a0a]"><ArrowLeft size={18} /> Voltar para o login</Link>
-        <div className="mt-8 flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#d0d0d0] text-[#0a0a0a]"><CheckCircle size={25} weight="bold" /></span><div><h1 className="font-['Space_Grotesk'] text-3xl font-bold text-[#0a0a0a]">Crie sua conta</h1><p className="mt-1 text-sm text-[#65736e]">Faça parte de uma comunidade que compartilha caminhos.</p></div></div>
-        <form onSubmit={submit} className="mt-8 grid gap-4 sm:grid-cols-2" noValidate>
-          <label className="block text-sm font-semibold text-[#0a0a0a] sm:col-span-2">Nome completo<input required value={form.nome} onChange={(e) => updateField('nome', e.target.value)} autoComplete="name" placeholder="Como podemos chamar você?" className="form-input" /></label>
-          <label className="block text-sm font-semibold text-[#0a0a0a] sm:col-span-2">E-mail<input required value={form.usuario} onChange={(e) => updateField('usuario', e.target.value)} type="email" autoComplete="email" placeholder="voce@email.com" className="form-input" /></label>
-          <label className="block text-sm font-semibold text-[#0a0a0a]">Celular<input required value={form.celular} onChange={(e) => updateField('celular', e.target.value)} type="tel" autoComplete="tel" placeholder="(11) 98877-6655" className="form-input" /></label>
-          <label className="block text-sm font-semibold text-[#0a0a0a]">Foto <span className="font-normal text-[#89958f]">(opcional)</span><input value={form.foto} onChange={(e) => updateField('foto', e.target.value)} type="url" placeholder="https://..." className="form-input" /></label>
-          <label className="block text-sm font-semibold text-[#0a0a0a]">Senha<input required value={form.senha} onChange={(e) => updateField('senha', e.target.value)} type="password" autoComplete="new-password" placeholder="Mínimo de 6 caracteres" className="form-input" /></label>
-          <label className="block text-sm font-semibold text-[#0a0a0a]">Confirmar senha<input required value={form.confirmarSenha} onChange={(e) => updateField('confirmarSenha', e.target.value)} type="password" autoComplete="new-password" placeholder="Repita sua senha" className="form-input" /></label>
-          <label className="block text-sm font-semibold text-[#0a0a0a] sm:col-span-2">Sexo<select required value={form.sexo} onChange={(e) => updateField('sexo', e.target.value)} className="form-input"><option value="">Selecione uma opção</option><option value="f">Feminino</option><option value="m">Masculino</option><option value="outro">Outro</option></select></label>
+        <Link to="/login" className="inline-flex items-center gap-2 text-sm font-bold text-[#65736e] no-underline hover:text-[#0a0a0a]">
+          <ArrowLeft size={18} /> Voltar para o login
+        </Link>
+        
+        <div className="mt-8 flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#d0d0d0] text-[#0a0a0a]">
+            <CheckCircle size={25} weight="bold" />
+          </span>
+          <div>
+            <h1 className="font-['Space_Grotesk'] text-3xl font-bold text-[#0a0a0a]">Crie sua conta</h1>
+            <p className="mt-1 text-sm text-[#65736e]">Faça parte de uma comunidade que compartilha caminhos.</p>
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="mt-8 grid gap-5 sm:grid-cols-2" noValidate>
+          <label className="block text-sm font-semibold text-[#0a0a0a] sm:col-span-2">
+            Nome completo
+            <input required value={form.nome} onChange={(e) => updateField('nome', e.target.value)} autoComplete="name" placeholder="Como podemos chamar você?" className="mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-4 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0]" />
+          </label>
+          
+          <label className="block text-sm font-semibold text-[#0a0a0a] sm:col-span-2">
+            E-mail
+            <input required value={form.usuario} onChange={(e) => updateField('usuario', e.target.value)} type="email" autoComplete="email" placeholder="voce@email.com" className="mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-4 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0]" />
+          </label>
+          
+          <label className="block text-sm font-semibold text-[#0a0a0a]">
+            Celular
+            <input required value={form.celular} onChange={(e) => updateField('celular', e.target.value)} type="tel" autoComplete="tel" placeholder="(11) 98877-6655" className="mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-4 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0]" />
+          </label>
+          
+          <label className="block text-sm font-semibold text-[#0a0a0a]">
+            Foto <span className="font-normal text-[#89958f]">(opcional)</span>
+            <input value={form.foto} onChange={(e) => updateField('foto', e.target.value)} type="url" placeholder="https://..." className="mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-4 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0]" />
+          </label>
+          
+          <label className="block text-sm font-semibold text-[#0a0a0a]">
+            Senha
+            <input required value={form.senha} onChange={(e) => updateField('senha', e.target.value)} type="password" autoComplete="new-password" placeholder="Mínimo de 6 caracteres" className="mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-4 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0]" />
+          </label>
+          
+          <label className="block text-sm font-semibold text-[#0a0a0a]">
+            Confirmar senha
+            <input required value={form.confirmarSenha} onChange={(e) => updateField('confirmarSenha', e.target.value)} type="password" autoComplete="new-password" placeholder="Repita sua senha" className="mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-4 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0]" />
+          </label>
+          
+          <label className="block text-sm font-semibold text-[#0a0a0a] sm:col-span-2">
+            Sexo
+            <select required value={form.sexo} onChange={(e) => updateField('sexo', e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-[#d7dfd8] bg-[#fbfcf9] px-4 outline-none transition focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#d0d0d0]">
+              <option value="">Selecione uma opção</option>
+              <option value="f">Feminino</option>
+              <option value="m">Masculino</option>
+              <option value="outro">Outro</option>
+            </select>
+          </label>
+          
           {error && <p role="alert" className="text-sm font-medium text-[#b42318] sm:col-span-2">{error}</p>}
-          <button disabled={isLoading} className="mt-2 h-12 rounded-xl bg-[#0a0a0a] font-bold text-white transition hover:bg-[#1a1a1a] disabled:cursor-wait disabled:opacity-60 sm:col-span-2">{isLoading ? 'Criando conta...' : 'Criar minha conta'}</button>
+          
+          <button disabled={isLoading} className="mt-4 h-12 rounded-xl bg-[#0a0a0a] font-bold text-white transition hover:bg-[#1a1a1a] disabled:cursor-wait disabled:opacity-60 sm:col-span-2">
+            {isLoading ? 'Criando conta...' : 'Criar minha conta'}
+          </button>
         </form>
       </div>
     </section>
