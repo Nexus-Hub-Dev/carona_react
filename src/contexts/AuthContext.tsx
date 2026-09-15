@@ -3,16 +3,21 @@ import { createContext, useEffect, useState, type ReactNode } from "react";
 import type UsuarioLogin from "../models/UsuarioLogin";
 import { atualizarUsuario, login } from "../services/Service";
 import { ToastAlerta } from "../utils/ToastAlerta";
-
-const STORAGE_KEY = 'blogPessoalUsuario';
+import { STORAGE_KEY } from "../utils/authStorage";
 
 const usuarioInicial: UsuarioLogin = {
     id: 0,
     nome: '',
+    nomeReal: '',
+    nomeSocial: '',
+    comoChamar: '',
     usuario: '',
     senha: '',
     celular: '',
     foto: '',
+    genero: '',
+    dataNascimento: '',
+    idade: null,
     token: '',
 };
 
@@ -26,7 +31,7 @@ const sanitizeUsuario = (usuario: Partial<UsuarioLogin>): UsuarioLogin => ({
 interface AuthContextProps {
     usuario: UsuarioLogin
     handleLogin(usuario: Pick<UsuarioLogin, 'usuario' | 'senha'>): Promise<boolean>
-    handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto' | 'senha' | 'genero'>): Promise<boolean>
+    handleUpdateProfile(dados: Pick<UsuarioLogin, 'nomeReal' | 'nomeSocial' | 'comoChamar' | 'usuario' | 'celular' | 'foto' | 'senha' | 'genero' | 'dataNascimento'>): Promise<boolean>
     handleLogout(): void
     isLoading: boolean
     isLogout: boolean
@@ -121,7 +126,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     }
 
-    async function handleUpdateProfile(dados: Pick<UsuarioLogin, 'nome' | 'usuario' | 'celular' | 'foto' | 'senha' | 'genero'>): Promise<boolean> {
+    async function handleUpdateProfile(dados: Pick<UsuarioLogin, 'nomeReal' | 'nomeSocial' | 'comoChamar' | 'usuario' | 'celular' | 'foto' | 'senha' | 'genero' | 'dataNascimento'>): Promise<boolean> {
         try {
             const usuarioAtualizado = await atualizarUsuario(usuario.id, dados, usuario.token)
             setUsuario(sanitizeUsuario({ ...usuario, ...usuarioAtualizado, ...dados, token: usuario.token }))

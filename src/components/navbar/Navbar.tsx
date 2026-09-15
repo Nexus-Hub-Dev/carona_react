@@ -1,10 +1,12 @@
-import React, { useContext, useState } from 'react';
-import { CaretDown, List, MapPin, Plus, UserCircle, X, Info } from '@phosphor-icons/react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { CaretDown, List, Plus, UserCircle, X, Info } from '@phosphor-icons/react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../contexts/AuthContext';
- 
+
+// "Buscar Caronas" saiu do menu: agora a busca acontece pelo campo de
+// busca da Home (que já redireciona para os resultados), então não faz
+// mais sentido ter um atalho direto e separado no menu.
 const navItems = [
-  { label: 'Buscar\nCaronas', path: '/caronas', icon: MapPin },
   { label: 'Veículos', path: '/veiculos', icon: UserCircle },
   { label: 'Sobre', path: '/sobre', icon: Info }
 ];
@@ -14,9 +16,33 @@ export const Navbar: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { usuario, handleLogout } = useContext(AuthContext);
   const location = useLocation();
- 
+  const menuPerfilRef = useRef<HTMLDivElement>(null);
+
   const nomeExibido = usuario?.nome?.length > 7 ? `${usuario.nome.slice(0, 7)}...` : usuario?.nome;
- 
+
+  // O menu de perfil não fechava com Esc nem clicando fora — só clicando
+  // de novo no próprio botão.
+  useEffect(() => {
+    if (!isProfileOpen) return;
+
+    function aoClicarFora(evento: MouseEvent) {
+      if (!menuPerfilRef.current?.contains(evento.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    }
+
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') setIsProfileOpen(false);
+    }
+
+    document.addEventListener('mousedown', aoClicarFora);
+    document.addEventListener('keydown', aoTeclar);
+    return () => {
+      document.removeEventListener('mousedown', aoClicarFora);
+      document.removeEventListener('keydown', aoTeclar);
+    };
+  }, [isProfileOpen]);
+
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black px-4 text-white sm:px-6">
       <nav className="mx-auto flex h-19 max-w-[1200px] items-center gap-5" aria-label="Navegação principal">
@@ -24,9 +50,9 @@ export const Navbar: React.FC = () => {
         {/* LOGO ATUALIZADA - REDIRECIONA PARA /home */}
         <Link to="/home" className="mr-3 shrink-0 sm:mr-5">
           <img
-            src="https://ik.imagekit.io/beakrg2dk/PI3/navbar.png"
+            src="https://ik.imagekit.io/beakrg2dk/PI3/navbar.png?tr=f-webp"
             alt="Cora Logo"
-            className="h-8 object-contain"
+            className="h-10 object-contain sm:h-12"
           />
         </Link>
  
@@ -57,12 +83,13 @@ export const Navbar: React.FC = () => {
             Oferecer<br />Carona
           </Link>
  
-          <div className="relative">
+          <div className="relative" ref={menuPerfilRef}>
             <button
               type="button"
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className="flex h-11 items-center gap-2 rounded-full border border-[#3b3b3b] px-2.5 text-xs font-semibold text-white"
-              aria-label="Abrir perfil"
+              aria-label={isProfileOpen ? 'Fechar perfil' : 'Abrir perfil'}
+              aria-haspopup="menu"
               aria-expanded={isProfileOpen}
             >
               <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full bg-[#7e9b91] text-black">
@@ -79,7 +106,7 @@ export const Navbar: React.FC = () => {
             {isProfileOpen && (
               <div className="absolute right-0 top-13 z-50 w-56 rounded-2xl border border-[#333] bg-[#171717] p-2 shadow-2xl">
                 <Link to="/perfil" onClick={() => setIsProfileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Editar perfil</Link>
-                <Link to="/historico-caronas" onClick={() => setIsProfileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Histórico de caronas</Link>
+                <Link to="/historico-caronas" onClick={() => setIsProfileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Minhas solicitações</Link>
                 <Link to="/dados-bancarios" onClick={() => setIsProfileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-white no-underline hover:bg-[#292929]">Dados bancários</Link>
                 <button type="button" onClick={handleLogout} className="mt-1 w-full rounded-xl border-t border-[#333] px-3 py-2.5 text-left text-sm font-semibold text-red-300 hover:bg-[#292929]">Sair</button>
               </div>

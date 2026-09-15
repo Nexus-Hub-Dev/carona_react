@@ -2,15 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { AuthProvider } from './contexts/AuthContext.tsx'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
 
+// AuthProvider e ToastContainer ficam em App.tsx — aqui havia uma segunda
+// cópia dos dois, o que duplicava os toasts na tela.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-      <ToastContainer />
-    </AuthProvider>
+    <App />
   </StrictMode>,
 )
