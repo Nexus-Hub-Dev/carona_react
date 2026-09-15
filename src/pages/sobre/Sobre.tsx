@@ -88,7 +88,7 @@ const teamMembers = [
 
 function Sobre() {
   return (
-    <div className="min-h-screen bg-gray-100 py-16 md:py-24">
+    <div className="min-h-screen bg-surface-alt py-16 md:py-24">
       <div className="container mx-auto max-w-6xl px-6">
 
         {/* Logo Cora */}
@@ -115,7 +115,7 @@ function Sobre() {
           {teamMembers.map((member, index) => (
             <div
               key={member.name}
-              className={`flex flex-col items-center gap-8 rounded-[2.5rem] border border-gray-200 bg-[#F8F6F0] p-8 shadow-sm md:flex-row md:gap-12 md:p-12 ${
+              className={`flex flex-col items-center gap-8 rounded-[2.5rem] border border-gray-200 bg-bg p-8 shadow-sm md:flex-row md:gap-12 md:p-12 ${
                 index % 2 !== 0 ? 'md:flex-row-reverse' : ''
               }`}
             >
@@ -165,7 +165,7 @@ function Sobre() {
                   <MapPin
                     size={18}
                     weight="fill"
-                    className="text-[#1e3a8a]"
+                    className="text-pcd"
                   />
 
                   {member.city}

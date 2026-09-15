@@ -1,5 +1,7 @@
 import axios from "axios";
 import type { Veiculo } from "../models/Veiculo";
+import { ToastAlerta } from "../utils/ToastAlerta";
+import { STORAGE_KEY } from "../utils/authStorage";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -10,6 +12,34 @@ const authorizationHeader = (token: string) => ({
         ? token
         : `Bearer ${token}`,
 });
+
+// Em desenvolvimento local o back roda com banco H2 em memória: toda vez
+// que ele reinicia, os tokens emitidos antes disso deixam de existir,
+// mas a sessão salva no navegador continua lá. Sem isso, uma chamada
+// autenticada falha (401) em silêncio — a tela cai pra um estado vazio,
+// e parece que "a busca não funciona" quando na real é só sessão
+// expirada. Duas mensagens de 401 NÃO são sessão expirada (são
+// validação de negócio, com o próprio toast de quem chamou) e por isso
+// ficam de fora: login com senha errada, e "senha atual incorreta" ao
+// tentar trocar a senha no perfil.
+const MENSAGENS_401_QUE_NAO_SAO_SESSAO_EXPIRADA = ['Usuário ou senha inválidos.', 'Senha atual incorreta.'];
+
+api.interceptors.response.use(
+    (resposta) => resposta,
+    (erro) => {
+        const mensagem = erro?.response?.data?.message;
+        const eSessaoExpirada =
+            erro?.response?.status === 401 && !MENSAGENS_401_QUE_NAO_SAO_SESSAO_EXPIRADA.includes(mensagem);
+
+        if (eSessaoExpirada && window.location.pathname !== "/login") {
+            localStorage.removeItem(STORAGE_KEY);
+            ToastAlerta("Sua sessão expirou. Faça login novamente.", "erro");
+            window.location.assign("/login");
+        }
+
+        return Promise.reject(erro);
+    }
+);
 
 
 // ======================================================
@@ -286,6 +316,133 @@ export const removerVeiculo = async (
             headers: authorizationHeader(token),
         }
     );
+};
+
+// ======================================================
+// RESERVAS (solicitações de carona)
+// ======================================================
+
+export interface Reserva {
+  id: number;
+  viagemId: number;
+  passageiroId: number;
+  status: 'pendente' | 'aceita' | 'recusada' | 'cancelada';
+  motivo: string | null;
+  criadoEm: string;
+  atualizadoEm: string;
+  viagem: any;
+  passageiro: { id: number; nome: string; foto: string } | null;
+}
+
+// Solicitar uma vaga numa carona (fica pendente até o motorista aceitar).
+export const solicitarReserva = async (
+  viagemId: number,
+  token: string
+): Promise<Reserva> => {
+  const resposta = await api.post(
+    "/reservas",
+    { viagemId },
+    { headers: authorizationHeader(token) }
+  );
+
+  return resposta.data;
+};
+
+// Solicitações que EU fiz como passageiro/a.
+export const listarMinhasSolicitacoes = async (
+  token: string
+): Promise<Reserva[]> => {
+  const resposta = await api.get("/reservas/minhas", {
+    headers: authorizationHeader(token),
+  });
+
+  return resposta.data;
+};
+
+// Solicitações recebidas nas caronas que EU ofereço.
+export const listarSolicitacoesRecebidas = async (
+  token: string
+): Promise<Reserva[]> => {
+  const resposta = await api.get("/reservas/recebidas", {
+    headers: authorizationHeader(token),
+  });
+
+  return resposta.data;
+};
+
+export const aceitarSolicitacao = async (
+  id: number,
+  token: string
+): Promise<Reserva> => {
+  const resposta = await api.put(
+    `/reservas/${id}/aceitar`,
+    {},
+    { headers: authorizationHeader(token) }
+  );
+
+  return resposta.data;
+};
+
+export const recusarSolicitacao = async (
+  id: number,
+  token: string
+): Promise<Reserva> => {
+  const resposta = await api.put(
+    `/reservas/${id}/recusar`,
+    {},
+    { headers: authorizationHeader(token) }
+  );
+
+  return resposta.data;
+};
+
+export const cancelarSolicitacao = async (
+  id: number,
+  token: string
+): Promise<Reserva> => {
+  const resposta = await api.delete(`/reservas/${id}`, {
+    headers: authorizationHeader(token),
+  });
+
+  return resposta.data;
+};
+
+// ======================================================
+// CHAT DA RESERVA
+// ======================================================
+
+export interface MensagemChat {
+  id: number;
+  reservaId: number;
+  autorId: number;
+  texto: string;
+  criadoEm: string;
+  autor: { id: number; nome: string; foto: string } | null;
+}
+
+export const listarMensagens = async (
+  reservaId: number,
+  token: string
+): Promise<MensagemChat[]> => {
+  const resposta = await api.get(`/reservas/${reservaId}/mensagens`, {
+    headers: authorizationHeader(token),
+  });
+
+  return resposta.data;
+};
+
+export const enviarMensagem = async (
+  reservaId: number,
+  texto: string,
+  token: string
+): Promise<MensagemChat> => {
+  const resposta = await api.post(
+    `/reservas/${reservaId}/mensagens`,
+    { texto },
+    { headers: authorizationHeader(token) }
+  );
+
+  return resposta.data;
 };
 
 //feat_Mapa: Função gerarMapa

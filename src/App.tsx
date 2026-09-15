@@ -13,14 +13,17 @@ import Footer from "./components/footer/Footer"
 import Navbar from "./components/navbar/Navbar"
 import { VLibras } from "./components/vlibras/VLibras" // 1. Importação do seu componente VLibras
 import { AuthContext, AuthProvider } from "./contexts/AuthContext"
+import { useNotificacoesReservas } from "./hooks/useNotificacoesReservas"
 
 import Cadastro from "./pages/cadastro/Cadastro"
 import { Caronas } from "./pages/caronas/Caronas"
 import { CriarCarona } from "./pages/caronas/CriarCaronas"
 import ContaPage from "./pages/conta/ContaPage"
 import Home from "./pages/home/Home"
+import LandingPage from "./pages/landing/LandingPage"
 import Login from "./pages/login/Login"
 import Perfil from "./pages/perfil/Perfil"
+import MinhasSolicitacoes from "./pages/solicitacoes/MinhasSolicitacoes"
 import Sobre from "./pages/sobre/Sobre"
 import Veiculos from "./pages/veiculos/Veiculos"
 
@@ -44,19 +47,31 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const { pathname } = useLocation()
 
-  const isAuthenticationPage =
+  // Roda em qualquer página autenticada (o hook mesmo já checa se há
+  // usuário logado) — pedido de carona recebido ou resposta a um pedido
+  // feito viram toast na hora, sem precisar estar com "Minhas
+  // solicitações" aberta.
+  useNotificacoesReservas()
+
+  // "/" (landing pública), "/login" e "/cadastro" não usam a navbar
+  // autenticada. A landing, porém, é uma página de rolagem longa como a
+  // Home — faz sentido manter o rodapé nela, diferente das telas de
+  // login/cadastro (centralizadas, sem rodapé).
+  const escondeNavbar =
+    pathname === "/" || pathname === "/login" || pathname === "/cadastro"
+  const escondeFooter =
     pathname === "/login" || pathname === "/cadastro"
 
   return (
     <div className="flex min-h-screen flex-col">
-      {!isAuthenticationPage && <Navbar />}
+      {!escondeNavbar && <Navbar />}
 
       <main className="flex flex-1 flex-col">
         <Routes>
           {/* Rotas públicas */}
           <Route
             path="/"
-            element={<Navigate to="/login" replace />}
+            element={<LandingPage />}
           />
 
           <Route
@@ -128,10 +143,7 @@ function AppContent() {
             path="/historico-caronas"
             element={
               <ProtectedRoute>
-                <ContaPage
-                  titulo="Histórico de caronas"
-                  descricao="Consulte suas viagens oferecidas e reservadas."
-                />
+                <MinhasSolicitacoes />
               </ProtectedRoute>
             }
           />
@@ -160,9 +172,11 @@ function AppContent() {
         </Routes>
       </main>
 
-      {!isAuthenticationPage && <Footer />}
+      {!escondeFooter && <Footer />}
 
-      <ToastContainer />
+      {/* limit=1: evita toasts sobrepostos quando duas ações disparam alerta em
+          sequência rápida (ex: deslogar e logar de novo). */}
+      <ToastContainer limit={1} />
       
       {/* 2. Adicionado aqui ao final do layout */}
       <VLibras />

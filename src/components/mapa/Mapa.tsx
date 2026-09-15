@@ -194,7 +194,7 @@ function Mapa({ id }: MapaProps) {
 
         // Atraso longo (entre 1s e 7s) para não engasgar a API pública do OSRM
         const atrasoAleatorio = Math.floor(Math.random() * 6000) + 1000;
-        
+
         setTimeout(() => {
           desenharRotaNoMapa(mapa, coordenadasInicio, coordenadasFim);
         }, atrasoAleatorio);
@@ -215,19 +215,19 @@ function Mapa({ id }: MapaProps) {
   }, [viagem]);
 
 return erroDoMapa ? (
-    <div className="flex items-center justify-center h-full w-full bg-[#FAF8F5] relative overflow-hidden rounded-xl">
+    <div className="flex items-center justify-center h-full w-full bg-surface-soft relative overflow-hidden rounded-xl">
       {/* Elemento de fundo decorativo pontilhado */}
       <div className="absolute inset-0 border-2 border-dashed border-gray-400/40 rounded-xl m-2 pointer-events-none"></div>
-      
+
       {/* Conteúdo flutuante sem a caixa branca */}
       <div className="p-4 text-center z-10 flex flex-col items-center max-w-[90%]">
         {/* Carrinho animado com Tailwind */}
         <div className="text-4xl animate-bounce mb-2">🚗💨</div>
-        
+
         <h2 className="text-sm font-black text-gray-800 mb-1">Ops! O carrinho se perdeu...</h2>
         <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
-          {erroDoMapa === 'Coordenadas indisponíveis para esta viagem.' 
-            ? 'Não achamos o caminho exato no GPS para essa carona.' 
+          {erroDoMapa === 'Coordenadas indisponíveis para esta viagem.'
+            ? 'Não achamos o caminho exato no GPS para essa carona.'
             : erroDoMapa}
         </p>
       </div>

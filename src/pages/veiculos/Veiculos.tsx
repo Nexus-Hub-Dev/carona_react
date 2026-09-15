@@ -1,6 +1,8 @@
 import { useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { FormEvent } from 'react';
+import { Wheelchair } from '@phosphor-icons/react';
+import { ModalOverlay } from '../../components/ui/ModalOverlay';
 
 import type { Veiculo } from '../../models/Veiculo';
 import {
@@ -62,6 +64,15 @@ export function Veiculos() {
   const [cor, setCor] = useState('');
   const [capacidade, setCapacidade] = useState(1);
   const [acessivelPcd, setAcessivelPcd] = useState(false);
+
+  // Foto é opcional; os demais campos obrigatórios precisam ter conteúdo
+  // pra liberar o botão de salvar.
+  const formCompleto = Boolean(
+    modelo.trim() &&
+    placa.trim() &&
+    cor.trim() &&
+    Number.isInteger(capacidade) && capacidade >= 1
+  );
 
   /*
    * Carregar veículos
@@ -421,11 +432,11 @@ export function Veiculos() {
   }
 
   return (
-    <section className="flex flex-1 justify-center bg-[#F6F3EB] px-4 py-10">
+    <section className="flex flex-1 justify-center bg-bg px-4 py-10">
       <div className="w-full max-w-5xl">
 
         {/* Cabeçalho */}
-        <div className="overflow-hidden rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface-alt shadow-sm">
           <div className="flex items-center justify-between gap-3 bg-black p-6">
             <div>
               <h2 className="text-xl font-black text-white">
@@ -459,7 +470,7 @@ export function Veiculos() {
               veiculos.map((veiculo) => (
                 <div
                   key={veiculo.id}
-                  className="flex flex-col gap-4 rounded-xl border border-[#E2DDD3] bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-4 rounded-xl border border-border bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   {/* Informações */}
                   <div className="flex items-center gap-3">
@@ -548,16 +559,15 @@ export function Veiculos() {
       </div>
 
       {/* Modal */}
-      {mostrarModal && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="veiculo-modal-titulo"
-        >
+      <ModalOverlay
+        aberto={mostrarModal}
+        onFechar={limparFormulario}
+        labelledBy="veiculo-modal-titulo"
+        className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-4"
+      >
           <form
             onSubmit={cadastrarVeiculo}
-            className="w-full max-w-lg rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] p-6 shadow-2xl"
+            className="w-full max-w-lg rounded-2xl border border-border bg-surface-alt p-6 shadow-2xl"
           >
             {/* Cabeçalho do modal */}
             <div className="flex items-start justify-between gap-4">
@@ -599,7 +609,7 @@ export function Veiculos() {
                   onChange={(event) =>
                     setModelo(event.target.value)
                   }
-                  className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black"
+                  className="mt-1 w-full rounded-xl border border-border bg-white px-3 py-3 font-normal outline-none focus:border-black"
                   placeholder="Ex: Nissan Kicks"
                 />
               </label>
@@ -617,26 +627,24 @@ export function Veiculos() {
                       event.target.value.toUpperCase(),
                     )
                   }
-                  className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal uppercase outline-none focus:border-black"
+                  className="mt-1 w-full rounded-xl border border-border bg-white px-3 py-3 font-normal uppercase outline-none focus:border-black"
                   placeholder="Ex: QXO2M22"
                 />
               </label>
 
               {/* Foto */}
               <label className="block text-sm font-bold text-black">
-                Foto{' '}
-                <span className="font-normal text-gray-500">
-                  (opcional)
-                </span>
+                Foto do veículo{' '}
+                <span className="font-normal text-gray-500">(opcional)</span>
 
                 <input
+                  type="url"
                   value={foto}
                   onChange={(event) =>
                     setFoto(event.target.value)
                   }
-                  type="url"
-                  className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black"
-                  placeholder="https://exemplo.com/carro.jpg"
+                  className="mt-1 w-full rounded-xl border border-border bg-white px-3 py-3 font-normal outline-none focus:border-black"
+                  placeholder="https://..."
                 />
               </label>
 
@@ -650,7 +658,7 @@ export function Veiculos() {
                   onChange={(event) =>
                     setCor(event.target.value)
                   }
-                  className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black"
+                  className="mt-1 w-full rounded-xl border border-border bg-white px-3 py-3 font-normal outline-none focus:border-black"
                   placeholder="Ex: Azul"
                 />
               </label>
@@ -669,33 +677,34 @@ export function Veiculos() {
                       Number(event.target.value),
                     )
                   }
-                  className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black"
+                  className="mt-1 w-full rounded-xl border border-border bg-white px-3 py-3 font-normal outline-none focus:border-black"
                 />
               </label>
 
               {/* PCD */}
-              <label className="flex items-center gap-3 text-sm font-bold text-black">
-                <input
-                  type="checkbox"
-                  checked={acessivelPcd}
-                  onChange={(event) =>
-                    setAcessivelPcd(
-                      event.target.checked,
-                    )
-                  }
-                  className="h-4 w-4 accent-black"
-                />
-
+              <button
+                type="button"
+                onClick={() => setAcessivelPcd(!acessivelPcd)}
+                aria-pressed={acessivelPcd}
+                className={`flex w-full items-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold shadow-sm transition ${
+                  acessivelPcd
+                    ? 'border-pcd bg-pcd text-white'
+                    : 'border-pcd/25 bg-pcd/10 text-pcd hover:bg-pcd/20'
+                }`}
+              >
+                <Wheelchair size={18} weight={acessivelPcd ? 'fill' : 'bold'} className="shrink-0" />
                 Acessível para PCD
-              </label>
+              </button>
             </div>
 
             {/* Botões */}
             <div className="mt-6 flex gap-2">
               <button
                 type="submit"
-                disabled={salvando}
-                className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={salvando || !formCompleto}
+                className={`flex-1 rounded-xl px-5 py-3 font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  formCompleto ? 'bg-black text-white hover:bg-gray-800' : 'cursor-not-allowed border border-border bg-white text-muted'
+                }`}
               >
                 {salvando
                   ? 'Salvando...'
@@ -713,8 +722,7 @@ export function Veiculos() {
               </button>
             </div>
           </form>
-        </div>
-      )}
+      </ModalOverlay>
     </section>
   );
 }

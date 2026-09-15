@@ -1,299 +1,42 @@
-import { useContext, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ToastAlerta } from '../../utils/ToastAlerta';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Coins, Leaf } from '@phosphor-icons/react';
 import { obterVeiculos } from '../../utils/veiculos';
-import { atualizarViagem, listarViagens, removerViagem } from '../../services/Service';
-import { AuthContext } from '../../contexts/AuthContext';
-import Mapa from '../../components/mapa/Mapa'; // Importação do novo componente de Mapa
-import CarLoading from '../../components/loading/CarLoading';
+import BuscaBar from '../../components/busca/BuscaBar';
+import ResultadosCaronas, { type Periodo } from '../../components/caronas/ResultadosCaronas';
+import { ModalOverlay } from '../../components/ui/ModalOverlay';
 
-// Interface compatível com o schema da API e com suporte aos dados visuais do front
-interface ViagemVisual {
-  id: number;
-  motoristaNome: string;
-  motoristaFoto: string;
-  avaliacao: number;
-  totalCaronas: number;
-  badge: string;
-  veiculoModelo: string;
-  veiculoPlaca: string;
-  origem: string;
-  bairroOrigem?: string;
-  destino: string;
-  bairroDestino?: string;
-  horarioSaida: string;
-  horarioChegada: string;
-  distanciaKm: number;
-  tempoMinutos: number;
-  velocidadeMedia: number;
-  statusTransito?: string;
-  preco: number;
-  vagasDisponiveis: number;
-  apenasMulheres?: boolean;
-  acessivelPcd?: boolean;
-  usuarioId?: number;
-  veiculoId?: number;
-
-  // Campos prontos para integração com o Back-end
-  partida?: string;
+// Parâmetros que chegam da busca feita na Home (hero de busca) — a busca
+// agora redireciona para cá e os resultados aparecem nesta mesma página.
+interface ParametrosBusca {
+  origem?: string;
+  destino?: string;
   data?: string;
-  tempoEstimadoMin?: number;
-  valorKm?: number;
-  latitudePartida?: number;
-  longitudePartida?: number;
-  latitudeDestino?: number;
-  longitudeDestino?: number;
+  periodo?: Periodo;
+  vagas?: number;
+  apenasMulheres?: boolean;
+  pcd?: boolean;
+  pet?: boolean;
 }
-
-const INITIAL_VIAGENS: ViagemVisual[] = [
-  {
-    id: 1,
-    motoristaNome: 'Paula Diniz',
-    motoristaFoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    avaliacao: 4.96,
-    totalCaronas: 142,
-    badge: 'Super Condutora',
-    veiculoModelo: 'Nissan Kicks Azul',
-    veiculoPlaca: 'BRA2E19',
-    origem: 'Avenida Paulista, 900',
-    bairroOrigem: 'Bela Vista (Em frente à Gazeta)',
-    destino: 'Av. Brigadeiro Faria Lima, 2777',
-    bairroDestino: 'Itaim Bibi (Próximo ao Shopping Iguatemi)',
-    horarioSaida: '09:00',
-    horarioChegada: '09:40',
-    distanciaKm: 5.5,
-    tempoMinutos: 40,
-    velocidadeMedia: 30,
-    statusTransito: 'Trânsito leve',
-    preco: 20.86,
-    vagasDisponiveis: 3,
-    apenasMulheres: true,
-    acessivelPcd: true,
-  },
-  {
-    id: 2,
-    motoristaNome: 'Carlos Mendes',
-    motoristaFoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    avaliacao: 4.88,
-    totalCaronas: 80,
-    badge: 'Motorista Diário',
-    veiculoModelo: 'Renault Kwid Vermelho',
-    veiculoPlaca: 'QVR9121',
-    origem: 'Rua Palestra Itália, 200',
-    bairroOrigem: 'Perdizes (Próximo ao Allianz Parque)',
-    destino: 'Shopping Aricanduva',
-    bairroDestino: 'Av. Aricanduva, 5555 Zona Leste',
-    horarioSaida: '11:00',
-    horarioChegada: '11:55',
-    distanciaKm: 23,
-    tempoMinutos: 55,
-    velocidadeMedia: 60,
-    statusTransito: 'Marginal Tietê',
-    preco: 52.98,
-    vagasDisponiveis: 2,
-    apenasMulheres: false,
-    acessivelPcd: true,
-  },
-  {
-    id: 3,
-    motoristaNome: 'Rodrigo Tavares',
-    motoristaFoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    avaliacao: 5.0,
-    totalCaronas: 47,
-    badge: 'Pontual',
-    veiculoModelo: 'Honda Civic Prata',
-    veiculoPlaca: 'FSX8K52',
-    origem: 'Estação Pinheiros Linha 4',
-    bairroOrigem: 'Rua Capri (Terminal Intermodal)',
-    destino: 'Metrô Vila Mariana',
-    bairroDestino: 'Rua Domingos de Morais, 2100',
-    horarioSaida: '14:30',
-    horarioChegada: '15:05',
-    distanciaKm: 8.1,
-    tempoMinutos: 35,
-    velocidadeMedia: 32,
-    statusTransito: 'Trânsito normal',
-    preco: 18.50,
-    vagasDisponiveis: 1,
-    apenasMulheres: false,
-    acessivelPcd: false,
-  }
-];
 
 export function Caronas() {
   const navigate = useNavigate();
-  const { usuario } = useContext(AuthContext);
+  const location = useLocation();
 
-  const [viagens, setViagens] = useState<ViagemVisual[]>(INITIAL_VIAGENS);
-  const [carregandoViagens, setCarregandoViagens] = useState(true);
+  const parametrosBusca = (location.state as ParametrosBusca | null) ?? null;
+
   const [mostrarAlertaVeiculo, setMostrarAlertaVeiculo] = useState(false);
 
-  const [pontoPartida, setPontoPartida] = useState('');
-  const [destinoFinal, setDestinoFinal] = useState('');
-  const [periodo, setPeriodo] = useState<'Manha' | 'Tarde' | 'Noite' | 'Todos'>('Todos');
-  const [filtroApenasMulheres, setFiltroApenasMulheres] = useState(false);
-  const [filtroPcd, setFiltroPcd] = useState(false);
-
-  const [viagemEditando, setViagemEditando] = useState<ViagemVisual | null>(null);
-  const [editando, setEditando] = useState(false);
-  const [editarOrigem, setEditarOrigem] = useState('');
-  const [editarDestino, setEditarDestino] = useState('');
-  const [editarData, setEditarData] = useState('');
-  const [editarHorario, setEditarHorario] = useState('');
-  const [editarPreco, setEditarPreco] = useState('');
-  const [editarApenasMulheres, setEditarApenasMulheres] = useState(false);
-  const [editarAcessivelPcd, setEditarAcessivelPcd] = useState(false);
-
-  useEffect(() => {
-    let montado = true;
-
-    async function carregarViagens() {
-      try {
-        const viagensApi = await listarViagens(usuario.token);
-
-        const viagensFormatadas: ViagemVisual[] = viagensApi.map((viagem: any) => {
-          const data = viagem.data ? new Date(viagem.data) : null;
-          const tempoMinutos = Number(viagem.tempoEstimadoMin ?? 0);
-          const chegada = data ? new Date(data.getTime() + tempoMinutos * 60_000) : null;
-
-          return {
-            id: viagem.id,
-            motoristaNome: viagem.usuario?.nome ?? 'Motorista',
-            motoristaFoto: viagem.usuario?.foto ?? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-            avaliacao: 0,
-            totalCaronas: 0,
-            badge: '',
-            veiculoModelo: viagem.veiculo?.modelo ?? 'Veículo não informado',
-            veiculoPlaca: viagem.veiculo?.placa ?? '',
-            origem: viagem.partida,
-            destino: viagem.destino,
-            horarioSaida: data ? data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
-            horarioChegada: chegada ? chegada.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
-            distanciaKm: Number(viagem.distanciaKm ?? 0),
-            tempoMinutos,
-            velocidadeMedia: Number(viagem.velocidadeMedia ?? 0),
-            preco: Number(viagem.valorSugerido ?? viagem.valorTotal ?? 0),
-            vagasDisponiveis: Number(viagem.vagasDisponiveis ?? 1),
-            apenasMulheres: viagem.apenasMulheres,
-            acessivelPcd: viagem.disponivelPCD,
-            latitudePartida: viagem.latitudePartida,
-            longitudePartida: viagem.longitudePartida,
-            latitudeDestino: viagem.latitudeDestino,
-            longitudeDestino: viagem.longitudeDestino,
-            usuarioId: viagem.usuario?.id,
-            veiculoId: viagem.veiculo?.id,
-          };
-        });
-
-        if (montado) setViagens(viagensFormatadas);
-      } catch {
-        if (montado) ToastAlerta('Não foi possível carregar as caronas cadastradas.', 'erro');
-      } finally {
-        if (montado) setCarregandoViagens(false);
-      }
-    }
-
-    carregarViagens();
-
-    return () => {
-      montado = false;
-    };
-  }, [usuario.token]);
-
-  function abrirEdicao(viagem: ViagemVisual) {
-    if (!viagem.usuarioId || viagem.usuarioId !== usuario.id) return;
-    
-    const dataViagem = viagem.data ? new Date(viagem.data) : new Date();
-
-    setViagemEditando(viagem);
-    setEditarOrigem(viagem.origem);
-    setEditarDestino(viagem.destino);
-    setEditarData(viagem.data ? dataViagem.toISOString().slice(0, 10) : '');
-    setEditarHorario(viagem.data ? dataViagem.toTimeString().slice(0, 5) : viagem.horarioSaida);
-    setEditarPreco(String(viagem.preco));
-    setEditarApenasMulheres(viagem.apenasMulheres === true);
-    setEditarAcessivelPcd(viagem.acessivelPcd === true);
-  }
-
-  async function salvarEdicao(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!viagemEditando) return;
-
-    const dataHora = new Date(`${editarData}T${editarHorario}:00`);
-    const valor = Number(editarPreco);
-
-    if (Number.isNaN(dataHora.getTime()) || dataHora < new Date() || !Number.isFinite(valor) || valor <= 0) {
-      ToastAlerta('Informe uma data futura e um valor válido.', 'erro');
-      return;
-    }
-
-    setEditando(true);
-
-    try {
-      await atualizarViagem({
-        id: viagemEditando.id,
-        partida: editarOrigem.trim(),
-        destino: editarDestino.trim(),
-        data: `${editarData}T${editarHorario}:00`,
-        disponivelPCD: editarAcessivelPcd,
-        apenasMulheres: editarApenasMulheres,
-        valorSugerido: valor,
-        usuario: { id: viagemEditando.usuarioId },
-        veiculo: { id: viagemEditando.veiculoId },
-      }, usuario.token);
-
-      setViagens((viagensAtuais) =>
-        viagensAtuais.map((viagem) =>
-          viagem.id === viagemEditando.id
-            ? {
-                ...viagem,
-                origem: editarOrigem.trim(),
-                destino: editarDestino.trim(),
-                horarioSaida: editarHorario,
-                preco: valor,
-                apenasMulheres: editarApenasMulheres,
-                acessivelPcd: editarAcessivelPcd
-              }
-            : viagem
-        )
-      );
-      setViagemEditando(null);
-      ToastAlerta('Carona atualizada com sucesso!', 'sucesso');
-    } catch (error: any) {
-      const mensagem = error?.response?.data?.message || error?.response?.data?.error;
-      ToastAlerta(mensagem || 'Não foi possível editar a carona.', 'erro');
-    } finally {
-      setEditando(false);
-    }
-  }
-
-  async function excluirCarona(viagem: ViagemVisual) {
-    if (viagem.usuarioId !== usuario.id) return;
-    if (!window.confirm('Deseja realmente excluir esta carona?')) return;
-
-    try {
-      await removerViagem(viagem.id, usuario.token);
-      setViagens((viagensAtuais) => viagensAtuais.filter((item) => item.id !== viagem.id));
-      ToastAlerta('Carona excluída com sucesso!', 'sucesso');
-    } catch (error: any) {
-      const mensagem = error?.response?.data?.message || error?.response?.data?.error;
-      ToastAlerta(mensagem || 'Não foi possível excluir a carona.', 'erro');
-    }
-  }
-
-  const handleReservar = (id: number) => {
-    setViagens((prevViagens) =>
-      prevViagens
-        .map((v) => {
-          if (v.id === id) {
-            return { ...v, vagasDisponiveis: v.vagasDisponiveis - 1 };
-          }
-          return v;
-        })
-        .filter((v) => v.vagasDisponiveis > 0)
-    );
-    ToastAlerta(`Reserva realizada para a carona #${id}!`, 'sucesso');
-  };
+  // Campos de busca — pré-preenchidos quando a gente chega aqui vindo da
+  // busca da Home (todos os parâmetros da viagem, não só origem/destino).
+  const [pontoPartida, setPontoPartida] = useState(() => parametrosBusca?.origem ?? '');
+  const [destinoFinal, setDestinoFinal] = useState(() => parametrosBusca?.destino ?? '');
+  const [dataFiltro, setDataFiltro] = useState(() => parametrosBusca?.data ?? '');
+  const [vagasFiltro, setVagasFiltro] = useState(() => parametrosBusca?.vagas ?? 1);
+  const [periodo, setPeriodo] = useState<Periodo>(() => parametrosBusca?.periodo ?? 'Todos');
+  const [filtroApenasMulheres, setFiltroApenasMulheres] = useState(() => Boolean(parametrosBusca?.apenasMulheres));
+  const [filtroPcd, setFiltroPcd] = useState(() => Boolean(parametrosBusca?.pcd));
+  const [filtroPet, setFiltroPet] = useState(() => Boolean(parametrosBusca?.pet));
 
   const handleCriarCarona = () => {
     if (obterVeiculos().length === 0) {
@@ -303,24 +46,16 @@ export function Caronas() {
     navigate('/oferecer-carona');
   };
 
-  const viagensFiltradas = viagens.filter((viagem) => {
-    const atendePartida = viagem.origem.toLowerCase().includes(pontoPartida.toLowerCase()) ||
-      (viagem.bairroOrigem && viagem.bairroOrigem.toLowerCase().includes(pontoPartida.toLowerCase()));
-    const atendeDestino = viagem.destino.toLowerCase().includes(destinoFinal.toLowerCase()) ||
-      (viagem.bairroDestino && viagem.bairroDestino.toLowerCase().includes(destinoFinal.toLowerCase()));
-    
-    const atendeMulheres = filtroApenasMulheres ? viagem.apenasMulheres : true;
-    const atendePcd = filtroPcd ? viagem.acessivelPcd : true;
-
-    return atendePartida && atendeDestino && atendeMulheres && atendePcd;
-  });
-
   return (
-    <div className="min-h-screen bg-[#F6F3EB] text-[#000000] font-sans pb-16">
-      
+    <div className="min-h-screen bg-bg text-ink font-sans pb-16">
+
       {/* Alerta de Veículo */}
-      {mostrarAlertaVeiculo && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-labelledby="veiculo-alerta-titulo">
+      <ModalOverlay
+        aberto={mostrarAlertaVeiculo}
+        onFechar={() => setMostrarAlertaVeiculo(false)}
+        labelledBy="veiculo-alerta-titulo"
+        className="fixed inset-0 z-50 grid place-items-center bg-black/50 px-4"
+      >
           <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-amber-100 text-2xl">🚗</div>
             <h2 id="veiculo-alerta-titulo" className="mt-4 text-xl font-black text-black">Adicione um veículo para continuar</h2>
@@ -330,8 +65,7 @@ export function Caronas() {
               <button type="button" onClick={() => setMostrarAlertaVeiculo(false)} className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-100">Agora não</button>
             </div>
           </div>
-        </div>
-      )}
+      </ModalOverlay>
 
       {/* Hero Section */}
       <section className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-8 sm:flex-row sm:items-center sm:justify-between">
@@ -343,197 +77,48 @@ export function Caronas() {
         <button type="button" onClick={handleCriarCarona} className="shrink-0 rounded-xl bg-black px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-gray-800">Criar uma carona</button>
       </section>
 
-      {/* BARRA DE FILTROS */}
+      {/* BARRA DE BUSCA / FILTROS — mesmo componente "bilhete de trajeto" da
+          Home e da landing pública (variant="compacta"), recebe todos os
+          parâmetros vindos da Home e também pode ser ajustada direto aqui,
+          sem sair da página. */}
       <section className="max-w-6xl mx-auto pt-4 sm:pt-8 px-4">
-        <div className="bg-[#EFECE6] rounded-2xl p-3 sm:p-4 shadow-sm border border-[#E2DDD3] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          
-          {/* Inputs de Partida e Destino */}
-          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto flex-1">
-            <div className="flex-1 w-full bg-[#FAF8F5] rounded-xl px-3 py-2 border border-[#E2DDD3] focus-within:border-black transition-all">
-              <span className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">Ponto de Partida</span>
-              <input type="text" placeholder="Ex: Avenida Paulista" value={pontoPartida} onChange={(e) => setPontoPartida(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400" />
-            </div>
-            <div className="flex-1 w-full bg-[#FAF8F5] rounded-xl px-3 py-2 border border-[#E2DDD3] focus-within:border-black transition-all">
-              <span className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">Destino Final</span>
-              <input type="text" placeholder="Ex: Faria Lima" value={destinoFinal} onChange={(e) => setDestinoFinal(e.target.value)} className="w-full bg-transparent text-sm font-semibold text-black focus:outline-none placeholder-gray-400" />
-            </div>
-          </div>
-
-          {/* FILTROS ESPECIAIS & PERIODO */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full md:w-auto">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
-              <button onClick={() => setFiltroApenasMulheres(!filtroApenasMulheres)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${filtroApenasMulheres ? 'bg-[#831843] text-white shadow-sm' : 'bg-[#831843]/10 text-[#831843] hover:bg-[#831843]/20'}`}>
-                <span>👩</span> Exclusivo Mulheres
-              </button>
-              <button onClick={() => setFiltroPcd(!filtroPcd)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${filtroPcd ? 'bg-[#1e3a8a] text-white shadow-sm' : 'bg-[#1e3a8a]/10 text-[#1e3a8a] hover:bg-[#1e3a8a]/20'}`}>
-                <span>♿</span> Apta para PCD
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-1 bg-[#E2DDD3] p-1 rounded-xl shrink-0">
-              {(['Manha', 'Tarde', 'Noite'] as const).map((p) => (
-                <button key={p} onClick={() => setPeriodo(periodo === p ? 'Todos' : p)} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${periodo === p ? 'bg-black text-white' : 'text-gray-700 hover:text-black'}`}>
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
+          <BuscaBar
+            variant="compacta"
+            origem={pontoPartida}
+            onOrigemChange={setPontoPartida}
+            destino={destinoFinal}
+            onDestinoChange={setDestinoFinal}
+            data={dataFiltro}
+            onDataChange={setDataFiltro}
+            periodo={periodo}
+            onPeriodoChange={setPeriodo}
+            vagas={vagasFiltro}
+            onVagasChange={setVagasFiltro}
+            apenasMulheres={filtroApenasMulheres}
+            onApenasMulheresChange={setFiltroApenasMulheres}
+            pcd={filtroPcd}
+            onPcdChange={setFiltroPcd}
+            pet={filtroPet}
+            onPetChange={setFiltroPet}
+          />
         </div>
       </section>
 
-      {/* LISTA DE CARONAS */}
+      {/* LISTA DE CARONAS — os resultados aparecem aqui mesmo, na mesma
+          página da busca, sem navegação extra. */}
       <section className="max-w-6xl mx-auto mt-6 sm:mt-8 px-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-2">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-black">Caronas Disponíveis</h1>
-            <span className="bg-[#EFECE6] text-gray-800 text-[11px] sm:text-xs font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full whitespace-nowrap border border-[#E2DDD3]">
-              {viagensFiltradas.length} hoje
-            </span>
-          </div>
-          <span className="text-xs font-medium text-gray-600">São Paulo e Região Metropolitana • Preços por assento</span>
-        </div>
-
-        <div className="flex flex-col gap-4 sm:gap-6">
-          {carregandoViagens ? (
-            <CarLoading label="Carregando caronas cadastradas..." />
-          ) : viagensFiltradas.length === 0 ? (
-            <div className="text-center py-12 bg-[#EFECE6] rounded-2xl border border-[#E2DDD3] text-gray-600 font-semibold px-4 text-sm">Nenhuma carona encontrada com os filtros selecionados.</div>
-          ) : (
-            viagensFiltradas.map((viagem) => (
-              <div key={viagem.id} className="bg-[#EFECE6] rounded-2xl p-4 sm:p-6 border border-[#E2DDD3] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col lg:flex-row items-stretch justify-between gap-4 sm:gap-6 group">
-                
-                {/* Perfil e Detalhes da Rota */}
-                <div className="flex-1 w-full space-y-3 sm:space-y-4">
-                  
-                  {/* Cabeçalho do Card: Perfil + Veículo */}
-                  <div className="flex items-start justify-between gap-2 border-b border-[#E2DDD3] pb-3">
-                    <div className="flex items-start gap-2.5 sm:gap-3">
-                      <img src={viagem.motoristaFoto} alt={viagem.motoristaNome} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-[#E2DDD3] shadow-sm shrink-0" />
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-bold text-sm sm:text-base text-black group-hover:text-blue-700 transition-colors">{viagem.motoristaNome}</h3>
-                          <span className="text-xs font-bold text-black flex items-center gap-0.5">★ {viagem.avaliacao.toFixed(2)}</span>
-                          <span className="text-xs text-gray-500 font-medium">({viagem.totalCaronas})</span>
-                        </div>
-                        
-                        {/* TAGS */}
-                        <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
-                          {viagem.badge && <span className="bg-[#E2DDD3] text-gray-800 text-[10px] font-bold px-2 py-0.5 rounded">{viagem.badge}</span>}
-                          {viagem.acessivelPcd && <span className="bg-[#1e3a8a] text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><span>♿</span> Apta para PCD</span>}
-                          {viagem.apenasMulheres && <span className="bg-[#831843] text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><span>👩</span> Exclusivo Mulheres</span>}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Modelo do Veículo */}
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-gray-900">{viagem.veiculoModelo}</p>
-                      <p className="text-[10px] font-bold text-gray-500 tracking-wider uppercase">{viagem.veiculoPlaca}</p>
-                    </div>
-                  </div>
-
-                  {/* Percurso */}
-                  <div className="space-y-3 pl-3 border-l-2 border-gray-900 ml-1">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-black">{viagem.horarioSaida}</span>
-                        <span className="text-[9px] font-extrabold text-gray-500 tracking-wider">EMBARQUE</span>
-                      </div>
-                      <p className="text-xs font-bold text-gray-900 leading-tight">{viagem.origem}</p>
-                      {viagem.bairroOrigem && <p className="text-[11px] text-gray-500 leading-tight">{viagem.bairroOrigem}</p>}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-black">{viagem.horarioChegada}</span>
-                        <span className="text-[9px] font-extrabold text-gray-500 tracking-wider">DESEMBARQUE</span>
-                      </div>
-                      <p className="text-xs font-bold text-gray-900 leading-tight">{viagem.destino}</p>
-                      {viagem.bairroDestino && <p className="text-[11px] text-gray-500 leading-tight">{viagem.bairroDestino}</p>}
-                    </div>
-                  </div>
-
-                  {/* Métricas do trajeto */}
-                  <div className="flex items-center gap-3 text-[11px] text-gray-600 font-medium pt-1 flex-wrap">
-                    <span>⏱ {viagem.tempoMinutos.toFixed(0)} min</span>
-                    <span>🛣️ {viagem.distanciaKm.toFixed(1)} Km</span>
-                    <span>🚗 {viagem.velocidadeMedia.toFixed(0)} Km/h</span>
-                  </div>
-                </div>
-
-                {/* NOVO MAPA COM MAPLIBRE E API */}
-                <div className="w-full lg:w-64 h-36 sm:h-40 rounded-xl overflow-hidden border border-[#E2DDD3] shadow-inner relative bg-[#FAF8F5] shrink-0 group-hover:border-gray-400 transition-colors">
-                  <Mapa id={viagem.id.toString()} />
-                  
-                  {viagem.statusTransito && (
-                    <div className="absolute bottom-2 left-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-sm z-10 shadow-sm">
-                      {viagem.statusTransito}
-                    </div>
-                  )}
-                </div>
-
-                {/* Preço e Botão de Reserva */}
-                <div className="w-full lg:w-44 flex flex-row lg:flex-col justify-between items-center lg:justify-center border-t lg:border-t-0 lg:border-l border-[#E2DDD3] pt-3 lg:pt-0 lg:pl-6 gap-3 shrink-0">
-                  <div className="text-left lg:text-right">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Preço por assento</span>
-                    <span className="text-xl sm:text-2xl font-black text-black block leading-none my-0.5">R$ {viagem.preco.toFixed(2).replace('.', ',')}</span>
-                    <span className="inline-block text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">{viagem.vagasDisponiveis} vagas restantes</span>
-                  </div>
-                  
-                  <button onClick={() => handleReservar(viagem.id)} className="w-auto lg:w-full bg-black hover:bg-gray-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-sm active:scale-95 shrink-0">
-                    Reservar
-                  </button>
-
-                  {viagem.usuarioId === usuario.id && (
-                    <>
-                      <button type="button" onClick={() => abrirEdicao(viagem)} className="w-auto lg:w-full rounded-xl border border-gray-300 px-5 py-2.5 text-xs font-bold text-gray-800 transition hover:bg-gray-100">
-                        Editar carona
-                      </button>
-                      <button type="button" onClick={() => excluirCarona(viagem)} className="w-auto lg:w-full rounded-xl border border-red-200 px-5 py-2.5 text-xs font-bold text-red-700 transition hover:bg-red-50">
-                        Excluir carona
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <ResultadosCaronas
+          origem={pontoPartida}
+          destino={destinoFinal}
+          data={dataFiltro}
+          periodo={periodo}
+          vagas={vagasFiltro}
+          apenasMulheres={filtroApenasMulheres}
+          pcd={filtroPcd}
+          pet={filtroPet}
+        />
       </section>
-
-      {/* Modal de Edição (Inalterado) */}
-      {viagemEditando && (
-        <div className="fixed inset-0 z-60 grid place-items-center bg-black/55 px-4" role="dialog" aria-modal="true" aria-labelledby="editar-carona-titulo">
-          <form onSubmit={salvarEdicao} className="w-full max-w-lg space-y-4 rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Minhas caronas</p>
-                <h2 id="editar-carona-titulo" className="mt-1 text-2xl font-black text-black">Editar carona</h2>
-              </div>
-              <button type="button" onClick={() => setViagemEditando(null)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-full text-xl text-gray-500 hover:bg-white hover:text-black">×</button>
-            </div>
-            
-            <label className="block text-sm font-bold text-black">Partida<input required minLength={3} value={editarOrigem} onChange={(event) => setEditarOrigem(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
-            <label className="block text-sm font-bold text-black">Destino<input required minLength={3} value={editarDestino} onChange={(event) => setEditarDestino(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-sm font-bold text-black">Data<input required type="date" value={editarData} onChange={(event) => setEditarData(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
-              <label className="block text-sm font-bold text-black">Horário<input required type="time" value={editarHorario} onChange={(event) => setEditarHorario(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
-            </div>
-            
-            <label className="block text-sm font-bold text-black">Valor por assento<input required min="0.01" step="0.01" type="number" value={editarPreco} onChange={(event) => setEditarPreco(event.target.value)} className="mt-1 w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-3 font-normal outline-none focus:border-black" /></label>
-            
-            <div className="flex flex-wrap gap-4 text-sm font-bold text-black">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={editarApenasMulheres} onChange={(event) => setEditarApenasMulheres(event.target.checked)} /> Apenas mulheres</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={editarAcessivelPcd} onChange={(event) => setEditarAcessivelPcd(event.target.checked)} /> Acessível para PCD</label>
-            </div>
-            
-            <div className="flex gap-2 pt-2">
-              <button type="submit" disabled={editando} className="flex-1 rounded-xl bg-black px-5 py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-wait disabled:opacity-60">{editando ? 'Salvando...' : 'Salvar alterações'}</button>
-              <button type="button" onClick={() => setViagemEditando(null)} className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-white">Cancelar</button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* SEÇÃO INFORMATIVA (Inalterada) */}
       <section className="max-w-6xl mx-auto mt-12 sm:mt-20 px-4">
@@ -543,39 +128,35 @@ export function Caronas() {
           <p className="text-xs text-gray-600 mt-1">Mobilidade inteligente que reduz custos e emissões com máxima segurança.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <div className="bg-[#EFECE6] p-5 sm:p-8 rounded-2xl border border-[#E2DDD3] shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-alt p-5 sm:p-8 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-[#E2DDD3] flex items-center justify-center text-black mb-4 sm:mb-6">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 09 90 0118 0z" />
-                </svg>
+              <div className="w-10 h-10 rounded-xl bg-border flex items-center justify-center text-black mb-4 sm:mb-6">
+                <Coins size={20} weight="bold" />
               </div>
               <h3 className="font-bold text-sm text-black mb-1.5">Até 70% de Economia</h3>
               <p className="text-xs text-gray-600 leading-relaxed">Compartilhe os gastos reais de combustível e pedágio sem tarifas surpresas.</p>
             </div>
           </div>
           {/* Outros cards da seção mantidos */}
-          <div className="bg-[#EFECE6] p-5 sm:p-8 rounded-2xl border border-[#E2DDD3] shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-alt p-5 sm:p-8 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-[#831843]/10 flex items-center justify-center text-[#831843] mb-4 sm:mb-6 font-bold">
+              <div className="w-10 h-10 rounded-xl bg-women/10 flex items-center justify-center text-women mb-4 sm:mb-6 font-bold">
                 👩
               </div>
               <h3 className="font-bold text-sm text-black mb-1.5">Inclusão & Segurança</h3>
               <p className="text-xs text-gray-600 leading-relaxed">Filtros exclusivos para viagens só entre mulheres e veículos adaptados para PCDs.</p>
             </div>
           </div>
-          <div className="bg-[#EFECE6] p-5 sm:p-8 rounded-2xl border border-[#E2DDD3] shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-alt p-5 sm:p-8 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-[#E2DDD3] flex items-center justify-center text-black mb-4 sm:mb-6">
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 20 012 2v1a2 2 0 002 2 2 2 0 002 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 20 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V14a2 2000-2-2h-2c-.53 0-1.04-.21-1.414-.5861-1.586-1.586A2 2 0 0110 8.5V7a2 2 0 00-2-2H5a2 2 0 00-2 2v1.935z" />
-                 </svg>
+              <div className="w-10 h-10 rounded-xl bg-border flex items-center justify-center text-black mb-4 sm:mb-6">
+                <Leaf size={20} weight="bold" />
               </div>
               <h3 className="font-bold text-sm text-black mb-1.5">Impacto Verde Real</h3>
               <p className="text-xs text-gray-600 leading-relaxed">Otimização de assentos vagos nas capitais, reduzindo a emissão de CO2.</p>
             </div>
           </div>
-          <div className="bg-[#EFECE6] p-5 sm:p-8 rounded-2xl border border-[#E2DDD3] shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-alt p-5 sm:p-8 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
             <div>
               <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 mb-4 sm:mb-6 font-bold">
                 ✓
@@ -584,7 +165,7 @@ export function Caronas() {
               <p className="text-xs text-gray-600 leading-relaxed">Perfis autênticos com avaliação mútua e validação de documentos para sua tranquilidade.</p>
             </div>
           </div>
-          <div className="bg-[#EFECE6] p-5 sm:p-8 rounded-2xl border border-[#E2DDD3] shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-alt p-5 sm:p-8 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
             <div>
               <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-800 mb-4 sm:mb-6 font-bold">
                 ⏱
@@ -593,7 +174,7 @@ export function Caronas() {
               <p className="text-xs text-gray-600 leading-relaxed">Centenas de horários ao longo do dia combinando com sua rotina de trabalho ou estudos.</p>
             </div>
           </div>
-          <div className="bg-[#EFECE6] p-5 sm:p-8 rounded-2xl border border-[#E2DDD3] shadow-sm flex flex-col justify-between">
+          <div className="bg-surface-alt p-5 sm:p-8 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
             <div>
               <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 mb-4 sm:mb-6 font-bold">
                 🛣

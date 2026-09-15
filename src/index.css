@@ -1,7 +1,96 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
-:root { font-family: 'DM Sans', sans-serif; color: #183b35; background: #f5efe4; font-synthesis: none; text-rendering: optimizeLegibility; }
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
-button, input { font: inherit; }
+/*
+ * Design tokens do CORA — fonte única de verdade (Tailwind v4 lê este
+ * bloco e gera as utilities: bg-ink, text-muted, font-display, etc.).
+ *
+ * Paleta: cinza e branco. Tudo neutro (cinza frio + branco + preto), sem
+ * matiz — a "cor de marca" (brand) é um preto/cinza-bem-escuro usado só
+ * como tom de ação primária. As cores semânticas das tags de viagem
+ * (mulher / pcd / pet) e as de status (success / warning / danger) ficam
+ * à parte, como indicadores funcionais — nunca como destaque decorativo.
+ * Os tons de status são os mesmos emerald/amber/red do Tailwind que o app
+ * já usava soltos, só que na variante 700 (contraste ≥ 4.5:1 com texto
+ * branco e sobre branco) e com um nome estável.
+ */
+@theme {
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'DM Sans', ui-sans-serif, sans-serif;
+
+  --color-bg: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-surface-alt: #eeeeee;
+  --color-surface-soft: #fafafa;
+  --color-border: #e2e2e2;
+  --color-ink: #141414;
+  /* #5f6774 em vez do antigo #6b7280: visualmente igual, mas passa AA
+     também sobre --color-bg e --color-surface-alt (4.9:1 sobre #eee). */
+  --color-muted: #5f6774;
+
+  --color-brand: #171717;
+  --color-brand-dark: #000000;
+  --color-brand-soft: #ececec;
+
+  --color-women: #831843;
+  --color-women-soft: #fce7f3;
+
+  --color-pcd: #1e3a8a;
+  --color-pcd-soft: #dbeafe;
+
+  --color-pet: #92400e;
+  --color-pet-soft: #fde9d0;
+
+  --color-success: #047857;
+  --color-success-soft: #d1fae5;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+}
+
+@layer base {
+  :root { font-family: var(--font-sans); color: var(--color-ink); background: var(--color-bg); font-synthesis: none; text-rendering: optimizeLegibility; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 320px; }
+  button, input, select, textarea { font: inherit; }
+  button, [role="button"] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+
+  /* Foco visível padrão para todo interativo, na cor de ação da paleta.
+     Inputs que usam outline-none + focus:border continuam com o próprio
+     estilo (a utility vem depois e vence). */
+  :focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Primitivas de UI. Servem para novas telas e para migrar aos poucos as
+   classes soltas repetidas nas páginas — o visual é o mesmo dos botões e
+   campos já validados, só que com um nome. */
+@layer components {
+  .btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60; }
+  .btn-primary { @apply bg-ink text-white hover:bg-black; }
+  .btn-secondary { @apply border border-border bg-white text-ink hover:border-ink hover:bg-surface-alt; }
+  .btn-ghost { @apply text-ink hover:bg-surface-alt; }
+  .btn-danger { @apply bg-red-800 text-white hover:bg-red-900; }
+
+  .eyebrow { @apply text-xs font-bold uppercase tracking-widest text-muted; }
+
+  .form-input {
+    @apply mt-1 w-full rounded-xl border border-border bg-surface-soft px-3 py-3 font-normal text-ink outline-none transition focus:border-ink focus:ring-2 focus:ring-brand/20;
+  }
+}
+
+/* Usada na transição do carrossel de exemplos da landing pública. */
+@keyframes cora-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

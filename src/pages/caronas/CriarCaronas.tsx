@@ -1,10 +1,11 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useId, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Car,
   Clock,
   GenderFemale,
   MapPin,
+  PawPrint,
   Wheelchair,
 } from '@phosphor-icons/react';
 
@@ -17,10 +18,21 @@ import {
   type CalculoRota,
 } from '../../services/Service';
 import { AuthContext } from '../../contexts/AuthContext';
+import { ehGeneroFeminino } from '../../utils/opcoesPerfil';
+import { classificarPreco, BADGE_PRECO, TEXTO_COR_PRECO } from '../../utils/precoJusto';
 
 export function CriarCarona() {
   const navigate = useNavigate();
   const { usuario } = useContext(AuthContext);
+
+  // Rótulos e campos aqui eram <label> soltos ao lado do <input>, sem
+  // htmlFor/id — clicar no texto não focava o campo e leitor de tela não
+  // anunciava o nome do campo.
+  const idOrigem = useId();
+  const idDestino = useId();
+  const idData = useId();
+  const idHorario = useId();
+  const idPreco = useId();
 
   // ============================================================
   // VEÍCULOS
@@ -129,12 +141,22 @@ export function CriarCarona() {
   const [acessivelPcd, setAcessivelPcd] =
     useState(false);
 
+  const [aceitaPet, setAceitaPet] =
+    useState(false);
+
+  const motoristaEhMulher = ehGeneroFeminino(usuario.genero);
+
   // ============================================================
   // PREÇO
   // ============================================================
 
   const [precoDigitado, setPrecoDigitado] =
     useState('');
+
+  const nivelPreco = useMemo(
+    () => classificarPreco(Number(precoDigitado), calculoRota?.valorSugerido),
+    [precoDigitado, calculoRota]
+  );
 
   // ============================================================
   // CALCULAR ROTA
@@ -299,37 +321,20 @@ export function CriarCarona() {
     }
 
     // ----------------------------------------------------------
-    // Apenas mulheres
+    // Carona exclusiva para mulher
     // ----------------------------------------------------------
 
-    if (
-      apenasMulheres &&
-      usuario.genero &&
-      usuario.genero.toLowerCase() !== 'feminino'
-    ) {
+    if (apenasMulheres && !motoristaEhMulher) {
       ToastAlerta(
-        'Apenas motoristas do gênero feminino podem criar viagens somente para mulheres.',
+        'Carona exclusiva para mulher só pode ser criada por motoristas do gênero feminino.',
         'erro'
       );
 
       return;
     }
 
-    // ----------------------------------------------------------
-    // Acessibilidade
-    // ----------------------------------------------------------
-
-    if (
-      acessivelPcd &&
-      veiculoSelecionado.acessivelPcd !== true
-    ) {
-      ToastAlerta(
-        'O veículo selecionado não está cadastrado como acessível para PCD.',
-        'erro'
-      );
-
-      return;
-    }
+    // Acessibilidade (PCD) é apenas conceitual aqui: é uma sinalização de
+    // intenção do motorista, sem nenhuma verificação técnica do veículo.
 
     // ----------------------------------------------------------
     // Formatação da data
@@ -356,6 +361,7 @@ export function CriarCarona() {
 
       disponivelPCD: acessivelPcd,
       apenasMulheres,
+      aceitaPet,
 
       valorSugerido:
         calculoRota?.valorSugerido ?? valorTotal,
@@ -397,6 +403,9 @@ export function CriarCarona() {
       setPrecoDigitado('');
       setCalculoRota(null);
       setErroCalculoRota('');
+      setApenasMulheres(false);
+      setAcessivelPcd(false);
+      setAceitaPet(false);
 
       navigate('/caronas');
     } catch (error: any) {
@@ -459,12 +468,12 @@ export function CriarCarona() {
   // ============================================================
 
   return (
-    <div className="min-h-screen bg-[#F6F3EB] text-[#000000] font-sans py-8 px-4">
+    <div className="min-h-screen bg-bg text-ink font-sans py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
 
         {/* CABEÇALHO */}
 
-        <div className="border-b border-[#E2DDD3] pb-5">
+        <div className="border-b border-border pb-5">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">
               Nova viagem
@@ -511,15 +520,15 @@ export function CriarCarona() {
 
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-[#E2DDD3] bg-[#EFECE6] shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-border bg-surface-alt shadow-sm">
 
-            <div className="border-b border-[#E2DDD3] px-5 py-3">
+            <div className="border-b border-border px-5 py-3">
               <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-black">
                 Selecione o veículo da viagem
               </span>
             </div>
 
-            <div className="grid gap-3 bg-[#FAF8F5] p-5 sm:grid-cols-2">
+            <div className="grid gap-3 bg-surface-soft p-5 sm:grid-cols-2">
 
               {veiculos.map((veiculo) => (
                 <button
@@ -538,7 +547,7 @@ export function CriarCarona() {
                     veiculo.id ===
                     veiculoSelecionadoId
                       ? 'border-black bg-black text-white'
-                      : 'border-[#E2DDD3] bg-white text-black hover:border-black'
+                      : 'border-border bg-white text-black hover:border-black'
                   }`}
                 >
 
@@ -592,14 +601,14 @@ export function CriarCarona() {
         {veiculoSelecionado && (
           <form
             onSubmit={handleSubmit}
-            className="bg-[#EFECE6] rounded-2xl p-5 sm:p-8 border border-[#E2DDD3] shadow-sm space-y-6"
+            className="bg-surface-alt rounded-2xl p-5 sm:p-8 border border-border shadow-sm space-y-6"
           >
 
             {/* ETAPA 1 */}
 
             <div className="space-y-4">
 
-              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-[#E2DDD3] pb-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-border pb-2">
                 1. Rota e Localidades
               </h2>
 
@@ -607,13 +616,14 @@ export function CriarCarona() {
 
                 {/* PARTIDA */}
 
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
+                <div className="bg-surface-soft rounded-xl p-3 border border-border focus-within:border-black transition-all">
 
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
+                  <label htmlFor={idOrigem} className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Ponto de Partida *
                   </label>
 
                   <input
+                    id={idOrigem}
                     type="text"
                     required
                     placeholder="Ex: Av. Paulista, 900"
@@ -629,13 +639,14 @@ export function CriarCarona() {
 
                 {/* DESTINO */}
 
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
+                <div className="bg-surface-soft rounded-xl p-3 border border-border focus-within:border-black transition-all">
 
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
+                  <label htmlFor={idDestino} className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Destino Final *
                   </label>
 
                   <input
+                    id={idDestino}
                     type="text"
                     required
                     placeholder="Ex: Faria Lima, 2777"
@@ -657,7 +668,7 @@ export function CriarCarona() {
 
             <div className="space-y-4">
 
-              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-[#E2DDD3] pb-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-border pb-2">
                 2. Horários e Detalhes
               </h2>
 
@@ -665,13 +676,14 @@ export function CriarCarona() {
 
                 {/* DATA */}
 
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
+                <div className="bg-surface-soft rounded-xl p-3 border border-border focus-within:border-black transition-all">
 
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
+                  <label htmlFor={idData} className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Data de Saída *
                   </label>
 
                   <input
+                    id={idData}
                     type="date"
                     required
                     min={dataMinima}
@@ -688,13 +700,14 @@ export function CriarCarona() {
 
                 {/* HORÁRIO */}
 
-                <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] focus-within:border-black transition-all">
+                <div className="bg-surface-soft rounded-xl p-3 border border-border focus-within:border-black transition-all">
 
-                  <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
+                  <label htmlFor={idHorario} className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
                     Horário de Saída *
                   </label>
 
                   <input
+                    id={idHorario}
                     type="time"
                     required
                     value={horarioSaida}
@@ -712,7 +725,7 @@ export function CriarCarona() {
 
               {/* VAGAS */}
 
-              <div className="bg-[#FAF8F5] rounded-xl p-3 border border-[#E2DDD3] flex items-center justify-between">
+              <div className="bg-surface-soft rounded-xl p-3 border border-border flex items-center justify-between">
 
                 <div>
                   <span className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase">
@@ -737,7 +750,7 @@ export function CriarCarona() {
                           )
                       )
                     }
-                    className="w-8 h-8 rounded-lg bg-[#E2DDD3] hover:bg-gray-300 font-bold text-black text-sm transition-all"
+                    className="w-8 h-8 rounded-lg bg-border hover:bg-gray-300 font-bold text-black text-sm transition-all"
                   >
                     -
                   </button>
@@ -757,7 +770,7 @@ export function CriarCarona() {
                           )
                       )
                     }
-                    className="w-8 h-8 rounded-lg bg-[#E2DDD3] hover:bg-gray-300 font-bold text-black text-sm transition-all"
+                    className="w-8 h-8 rounded-lg bg-border hover:bg-gray-300 font-bold text-black text-sm transition-all"
                   >
                     +
                   </button>
@@ -772,17 +785,18 @@ export function CriarCarona() {
 
             <div className="space-y-4">
 
-              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-[#E2DDD3] pb-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-border pb-2">
                 3. Valor da Viagem
               </h2>
 
-              <div className="bg-[#FAF8F5] rounded-2xl p-4 border border-[#E2DDD3]">
+              <div className="bg-surface-soft rounded-2xl p-4 border border-border">
 
-                <label className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase mb-1">
+                <label htmlFor={idPreco} className="text-[10px] font-bold tracking-wider text-gray-500 block uppercase mb-1">
                   Valor da viagem (R$) *
                 </label>
 
                 <input
+                  id={idPreco}
                   type="number"
                   min="0.01"
                   step="0.01"
@@ -794,28 +808,20 @@ export function CriarCarona() {
                       e.target.value
                     )
                   }
-                  className={`w-full rounded-xl border border-[#E2DDD3] bg-white px-3 py-2 text-sm font-bold outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100 ${
-                    !precoDigitado ||
-                    !calculoRota
-                      ? 'text-gray-500'
-                      : Number(
-                          precoDigitado
-                        ) >
-                        calculoRota.valorSugerido *
-                          1.3
-                        ? 'text-red-600'
-                        : Number(
-                              precoDigitado
-                            ) >
-                            calculoRota.valorSugerido
-                          ? 'text-amber-500'
-                          : 'text-emerald-600'
+                  className={`w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-bold outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100 ${
+                    nivelPreco ? TEXTO_COR_PRECO[nivelPreco] : 'text-gray-500'
                   }`}
                 />
 
                 <p className="mt-2 text-xs text-gray-600">
                   Informe o valor manualmente. Se os endereços forem preenchidos, uma sugestão será exibida automaticamente.
                 </p>
+
+                {nivelPreco && (
+                  <span className={`mt-2 inline-block rounded-full px-2.5 py-1 text-[11px] font-bold ${BADGE_PRECO[nivelPreco].classes}`}>
+                    {BADGE_PRECO[nivelPreco].texto}
+                  </span>
+                )}
 
                 {calculandoRota && (
                   <p className="mt-3 text-xs font-bold text-gray-600">
@@ -834,7 +840,7 @@ export function CriarCarona() {
 
                     {/* DISTÂNCIA */}
 
-                    <div className="flex items-center gap-3 rounded-xl border border-[#E2DDD3] bg-[#FAF8F5] p-3 text-gray-900">
+                    <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-soft p-3 text-gray-900">
 
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-gray-700 shadow-sm">
 
@@ -865,7 +871,7 @@ export function CriarCarona() {
 
                     {/* DURAÇÃO */}
 
-                    <div className="flex items-center gap-3 rounded-xl border border-[#E2DDD3] bg-[#FAF8F5] p-3 text-gray-900">
+                    <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-soft p-3 text-gray-900">
 
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-gray-700 shadow-sm">
 
@@ -903,16 +909,17 @@ export function CriarCarona() {
 
             <div className="space-y-4">
 
-              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-[#E2DDD3] pb-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-gray-700 border-b border-border pb-2">
                 4. Preferências da Viagem
               </h2>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
 
-                {/* MULHERES */}
+                {/* CARONA EXCLUSIVA PARA MULHER */}
 
                 <button
                   type="button"
+                  disabled={!motoristaEhMulher}
                   onClick={() =>
                     setApenasMulheres(
                       !apenasMulheres
@@ -921,14 +928,21 @@ export function CriarCarona() {
                   aria-pressed={
                     apenasMulheres
                   }
+                  title={
+                    motoristaEhMulher
+                      ? undefined
+                      : 'Disponível apenas para motoristas do gênero feminino.'
+                  }
                   className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
-                    apenasMulheres
-                      ? 'border-[#831843] bg-[#831843] text-white shadow-[0_0_0_3px_rgba(131,24,67,0.25)] hover:bg-[#70203b]'
-                      : 'border-[#E2DDD3] bg-white text-black hover:border-[#831843]'
+                    !motoristaEhMulher
+                      ? 'cursor-not-allowed border-border bg-surface-soft text-gray-400 opacity-60'
+                      : apenasMulheres
+                        ? 'border-women bg-women text-white shadow-[0_0_0_3px_rgba(131,24,67,0.25)] hover:bg-[#70203b]'
+                        : 'border-border bg-white text-black hover:border-women'
                   }`}
                 >
 
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${!motoristaEhMulher ? 'bg-black/5 text-gray-400' : apenasMulheres ? 'bg-white/15 text-white' : 'bg-women/10 text-women'}`}>
 
                     <GenderFemale
                       size={22}
@@ -941,18 +955,20 @@ export function CriarCarona() {
                   <span>
 
                     <span className="block text-[10px] font-bold uppercase tracking-wider">
-                      Exclusivo mulheres
+                      Carona exclusiva para mulher
                     </span>
 
-                    <span className="mt-1 block text-xs text-white/80">
-                      Apenas motoristas e passageiras mulheres
+                    <span className={`mt-1 block text-xs ${!motoristaEhMulher ? 'text-gray-400' : apenasMulheres ? 'text-white/80' : 'text-gray-500'}`}>
+                      {motoristaEhMulher
+                        ? 'Só passageiras mulheres podem solicitar essa vaga.'
+                        : 'Só disponível quando a motorista também é mulher.'}
                     </span>
 
                   </span>
 
                 </button>
 
-                {/* PCD */}
+                {/* PCD — sinalização conceitual */}
 
                 <button
                   type="button"
@@ -966,12 +982,12 @@ export function CriarCarona() {
                   }
                   className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
                     acessivelPcd
-                      ? 'border-[#1e3a8a] bg-[#1e3a8a] text-white shadow-[0_0_0_3px_rgba(30,58,138,0.25)] hover:bg-[#183273]'
-                      : 'border-[#E2DDD3] bg-white text-black hover:border-[#1e3a8a]'
+                      ? 'border-pcd bg-pcd text-white shadow-[0_0_0_3px_rgba(30,58,138,0.25)] hover:bg-[#183273]'
+                      : 'border-border bg-white text-black hover:border-pcd'
                   }`}
                 >
 
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15 text-white">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${acessivelPcd ? 'bg-white/15 text-white' : 'bg-pcd/10 text-pcd'}`}>
 
                     <Wheelchair
                       size={22}
@@ -984,11 +1000,54 @@ export function CriarCarona() {
                   <span>
 
                     <span className="block text-[10px] font-bold uppercase tracking-wider">
-                      Acessível para PCD
+                      Acessibilidade (conceitual)
                     </span>
 
-                    <span className="mt-1 block text-xs text-white/80">
-                      Veículo preparado para acessibilidade
+                    <span className={`mt-1 block text-xs ${acessivelPcd ? 'text-white/80' : 'text-muted'}`}>
+                      Sinalização de intenção — não verificamos o veículo
+                    </span>
+
+                  </span>
+
+                </button>
+
+                {/* PET */}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAceitaPet(
+                      !aceitaPet
+                    )
+                  }
+                  aria-pressed={
+                    aceitaPet
+                  }
+                  className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                    aceitaPet
+                      ? 'border-pet bg-pet text-white shadow-[0_0_0_3px_rgba(146,64,14,0.25)] hover:bg-[#7a3509]'
+                      : 'border-border bg-white text-black hover:border-pet'
+                  }`}
+                >
+
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${aceitaPet ? 'bg-white/15 text-white' : 'bg-pet/10 text-pet'}`}>
+
+                    <PawPrint
+                      size={22}
+                      weight="bold"
+                      aria-hidden="true"
+                    />
+
+                  </span>
+
+                  <span>
+
+                    <span className="block text-[10px] font-bold uppercase tracking-wider">
+                      Aceita pets
+                    </span>
+
+                    <span className={`mt-1 block text-xs ${aceitaPet ? 'text-white/80' : 'text-muted'}`}>
+                      Passageiros podem levar animais de estimação
                     </span>
 
                   </span>
@@ -1001,7 +1060,7 @@ export function CriarCarona() {
 
             {/* BOTÃO */}
 
-            <div className="pt-4 border-t border-[#E2DDD3]">
+            <div className="pt-4 border-t border-border">
 
               <button
                 type="submit"
