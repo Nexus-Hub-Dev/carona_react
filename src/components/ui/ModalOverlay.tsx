@@ -34,6 +34,16 @@ export function ModalOverlay({ aberto, onFechar, labelledBy, className, children
   const painelRef = useRef<HTMLDivElement>(null);
   const focoAnteriorRef = useRef<Element | null>(null);
 
+  // onFechar costuma ser passado como função inline por quem chama o
+  // modal, então muda de referência a cada render (ex.: toda vez que o
+  // usuário digita algo num campo do formulário). Guardar a versão mais
+  // recente numa ref evita que isso conte como dependência do efeito
+  // abaixo — senão o efeito reabre a cada tecla digitada e o .focus()
+  // no primeiro elemento focável (o botão de fechar) rouba o foco do
+  // campo que está sendo digitado.
+  const onFecharRef = useRef(onFechar);
+  onFecharRef.current = onFechar;
+
   useEffect(() => {
     if (!aberto) return;
 
@@ -49,7 +59,7 @@ export function ModalOverlay({ aberto, onFechar, labelledBy, className, children
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key === 'Escape') {
         evento.stopPropagation();
-        onFechar();
+        onFecharRef.current();
         return;
       }
 
@@ -81,7 +91,7 @@ export function ModalOverlay({ aberto, onFechar, labelledBy, className, children
         focoAnteriorRef.current.focus();
       }
     };
-  }, [aberto, onFechar]);
+  }, [aberto]);
 
   if (!aberto) return null;
 
